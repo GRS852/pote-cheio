@@ -35,5 +35,5 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u 0xCAlencar --password-stdin
-            docker pull ghcr.io/0xcalencar/petsbrasil:latest
+            docker pull ghcr.io/grs852/pote-cheio:latest
             docker compose -f /app/pote-cheio/site/docker-compose.yml up -d --force-recreate
