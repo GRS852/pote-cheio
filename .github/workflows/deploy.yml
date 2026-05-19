@@ -25,7 +25,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/0xcalencar/petsbrasil:latest
+          tags: ghcr.io/grs852/pote-cheio:latest
 
       - name: Deploy na VPS
         uses: appleboy/ssh-action@v1.0.3
