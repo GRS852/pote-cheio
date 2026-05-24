@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { Link, useRouter } from 'expo-router';
 import { COLORS } from '../constants/theme';
 
 interface AuthHeaderProps {
@@ -8,11 +9,16 @@ interface AuthHeaderProps {
 
 export default function AuthHeader({ activeTab }: AuthHeaderProps) {
   const isRegister = activeTab === 'Cadastrar';
+  const router = useRouter();
 
   return (
     <View>
       <View style={styles.container}>
-        <View style={styles.leftSection}>
+        <TouchableOpacity 
+          style={styles.leftSection} 
+          onPress={() => router.push('/')} 
+          activeOpacity={0.7}
+        >
           <Image source={require('../assets/images/logo.png')} style={styles.logoIcon} resizeMode="contain" />
           <Text style={styles.title}>
             <Text style={{color: COLORS.primary}}>Pets</Text> <Text style={{color: COLORS.secondary}}>Brasil</Text>
@@ -22,8 +28,9 @@ export default function AuthHeader({ activeTab }: AuthHeaderProps) {
               <Text style={styles.activeTabText}>{activeTab}</Text>
             </View>
           )}
-        </View>
-        <Text style={styles.helpLink}>Precisa de Ajuda?</Text>
+        </TouchableOpacity>
+        
+        <Link href="/help" style={styles.helpLink}>Precisa de Ajuda?</Link>
       </View>
       <View style={[styles.bottomLine, isRegister ? styles.lineRegister : styles.lineLogin]} />
     </View>

@@ -61,7 +61,7 @@ export default function LoginScreen() {
             </View>
 
             <Text style={styles.registerText}>
-              Novo no Pets Brasil? <Link href="/register" style={styles.registerLink}>Cadastre-se</Link>
+              Novo no Pote Cheio? <Link href="/register" style={styles.registerLink}>Cadastre-se</Link>
             </Text>
             
             <Text style={styles.termsText}>
