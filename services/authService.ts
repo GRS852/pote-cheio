@@ -21,7 +21,7 @@ export async function signInRequest(email: string, password: string) {
     response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, senha: password }),
     });
   } catch {
     // fetch lança TypeError quando há falha de rede (CORS, servidor off, sem internet)
