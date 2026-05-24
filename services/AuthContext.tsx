@@ -52,7 +52,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signIn(email: string, password: string) {
     const data = await signInRequest(email, password);
-    await saveToken(data.token);
+
+    // Suporte a diferentes nomes de campo que a API pode usar para o token
+    const token: string | undefined = data.token ?? data.access_token ?? data.jwt ?? data.authToken;
+
+    if (!token) {
+      throw new Error(
+        `Token não encontrado na resposta. Campos disponíveis: ${Object.keys(data ?? {}).join(', ')}`
+      );
+    }
+
+    await saveToken(token);
     setIsAuthenticated(true);
   }
 

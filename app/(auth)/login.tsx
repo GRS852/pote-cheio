@@ -7,7 +7,7 @@ import AuthHeader from '../../components/AuthHeader';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { COLORS } from '../../constants/theme';
-import { NetworkError } from '../../services/authService';
+import { AuthError, NetworkError } from '../../services/authService';
 import { useAuth } from '../../services/AuthContext';
 
 export default function LoginScreen() {
@@ -35,8 +35,13 @@ export default function LoginScreen() {
     } catch (err) {
       if (err instanceof NetworkError) {
         setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
-      } else {
+      } else if (err instanceof AuthError) {
         setError('E-mail ou senha inválidos. Tente novamente.');
+      } else {
+        // Erro inesperado: exibe a mensagem real para facilitar o diagnóstico
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[Login] Erro inesperado:', msg);
+        setError(`Erro inesperado: ${msg}`);
       }
     } finally {
       setIsSubmitting(false);

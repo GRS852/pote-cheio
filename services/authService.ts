@@ -37,5 +37,9 @@ export async function signInRequest(email: string, password: string) {
   }
 
   const data = await response.json();
+
+  // Log temporário para diagnóstico — remover após confirmar o campo correto
+  console.log('[Auth] Resposta da API:', JSON.stringify(data));
+
   return data; // espera { token: string, user: {...} }
 }
