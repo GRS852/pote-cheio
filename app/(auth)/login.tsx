@@ -7,6 +7,7 @@ import AuthHeader from '../../components/AuthHeader';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { COLORS } from '../../constants/theme';
+import { NetworkError } from '../../services/authService';
 import { useAuth } from '../../services/AuthContext';
 
 export default function LoginScreen() {
@@ -31,8 +32,12 @@ export default function LoginScreen() {
       setIsSubmitting(true);
       await signIn(form.email, form.password);
       // O RouteGuard detecta isAuthenticated = true e redireciona para /(app)/home automaticamente
-    } catch {
-      setError('E-mail ou senha inválidos. Tente novamente.');
+    } catch (err) {
+      if (err instanceof NetworkError) {
+        setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
+      } else {
+        setError('E-mail ou senha inválidos. Tente novamente.');
+      }
     } finally {
       setIsSubmitting(false);
     }
