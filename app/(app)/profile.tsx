@@ -1,11 +1,13 @@
+import { FontAwesome } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import MainHeader from '../../components/MainHeader';
-import ProfileUserInfo from '../../components/ProfileUserInfo';
-import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
 import DonationListItem from '../../components/DonationListItem';
+import MainHeader from '../../components/MainHeader';
+import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
+import ProfileUserInfo from '../../components/ProfileUserInfo';
 import { COLORS } from '../../constants/theme';
+import { useAuth } from '../../services/AuthContext';
 
 type TabType = 'Minhas doações' | 'Historia' | 'Favoritos';
 const TABS: TabType[] = ['Minhas doações', 'Historia', 'Favoritos'];
@@ -36,6 +38,26 @@ const MOCK_USER_PROFILE = {
 
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('Minhas doações');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { signOut } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sair da conta',
+      'Tem certeza que deseja sair?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLoggingOut(true);
+            await signOut();
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={styles.mainContainer}>
@@ -99,6 +121,22 @@ export default function ProfileScreen() {
             )}
           </View>
 
+          <TouchableOpacity
+            style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+            disabled={isLoggingOut}
+          >
+            {isLoggingOut ? (
+              <ActivityIndicator color="#C0392B" size="small" />
+            ) : (
+              <>
+                <FontAwesome name="sign-out" size={18} color="#C0392B" />
+                <Text style={styles.logoutText}>Sair da conta</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
         </View>
       </ScrollView>
     </View>
@@ -121,4 +159,18 @@ const styles = StyleSheet.create({
   favoriteImage: { width: '100%', height: '100%' },
   emptyStateContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyStateText: { fontSize: 16, color: COLORS.textLight },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#C0392B',
+    backgroundColor: '#FFF5F5',
+  },
+  logoutButtonDisabled: { opacity: 0.6 },
+  logoutText: { fontSize: 16, fontWeight: '600', color: '#C0392B' },
 });

@@ -43,3 +43,33 @@ export async function signInRequest(email: string, password: string) {
 
   return data; // espera { token: string, user: {...} }
 }
+
+export async function signUpRequest(name:string, email: string, password: string) {
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, senha: password }),
+    });
+  } catch {
+    // fetch lança TypeError quando há falha de rede (CORS, servidor off, sem internet)
+    throw new NetworkError();
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new AuthError();
+  }
+
+  if (!response.ok) {
+    throw new NetworkError(`Erro no servidor (${response.status}). Tente novamente mais tarde.`);
+  }
+
+  const data = await response.json();
+
+
+  console.log('[Auth] Resposta da API:', JSON.stringify(data));
+
+  return data;
+}
