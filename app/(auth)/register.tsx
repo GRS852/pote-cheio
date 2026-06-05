@@ -6,11 +6,33 @@ import AuthHeader from '../../components/AuthHeader';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { COLORS, SIZES } from '../../constants/theme';
+import { useAuth } from '../../services/AuthContext';
+import { ConflictError, NetworkError, ValidationError } from '../../services/authService';
 
 export default function RegisterScreen() {
+  const { signUp } = useAuth();
   const [form, setForm] = useState({ nome: '', dia: '', mes: '', ano: '', email: '', senha: '' });
-  
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
   const handleChange = (field: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleRegister = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const birthDate = `${form.ano}-${form.mes.padStart(2, '0')}-${form.dia.padStart(2, '0')}`;
+      await signUp(form.nome, form.email, form.senha, birthDate);
+    } catch (e) {
+      if (e instanceof ConflictError) setError('Este email já está cadastrado.');
+      else if (e instanceof ValidationError) setError(e.message);
+      else if (e instanceof NetworkError) setError('Sem conexão com o servidor. Tente novamente.');
+      else if (e instanceof Error) setError(e.message);
+      else setError('Não foi possível criar a conta.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView style={styles.mainContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -38,7 +60,8 @@ export default function RegisterScreen() {
             <Input label="Email" placeholder="seu@email.com" value={form.email} onChangeText={(t) => handleChange('email', t)} />
             <Input label="Senha" placeholder="*******" secureTextEntry value={form.senha} onChangeText={(t) => handleChange('senha', t)} />
 
-            <Button title="Continuar" onPress={() => console.log('Register Form:', form)} />
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <Button title="Continuar" onPress={handleRegister} loading={loading} />
 
             <Text style={styles.termsText}>
               Ao se inscrever, você concorda com os <Text style={styles.linkText}>termos de serviço</Text> e a <Text style={styles.linkText}>Política de Privacidade</Text>
@@ -71,5 +94,6 @@ const styles = StyleSheet.create({
   termsText: { textAlign: 'center', marginTop: 20, fontSize: 12, color: '#000' },
   linkText: { color: COLORS.secondary },
   loginText: { marginTop: 24, fontSize: 16, color: COLORS.textDark },
-  loginLink: { color: COLORS.primary, fontWeight: 'bold' }
+  loginLink: { color: COLORS.primary, fontWeight: 'bold' },
+  errorText: { color: 'red', fontSize: 14, marginBottom: 8, textAlign: 'center' }
 });

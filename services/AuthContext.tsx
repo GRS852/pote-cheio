@@ -32,7 +32,7 @@ type AuthContextType = {
   isAuthenticated: boolean;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string, birthDate: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -51,8 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadToken();
   }, []);
 
-  async function signUp(name:string, email: string, password: string) {
-    const data = await signUpRequest(name, email, password);
+  async function signUp(name: string, email: string, password: string, birthDate: string) {
+    const data = await signUpRequest(name, email, password, birthDate);
 
     // Suporte a diferentes nomes de campo que a API pode usar para o token
     const token: string | undefined = data.token ?? data.access_token ?? data.jwt ?? data.authToken;
