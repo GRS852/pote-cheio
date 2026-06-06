@@ -1,73 +1,75 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import ChatWidget from '../../components/ChatWidget';
 import MainHeader from '../../components/MainHeader';
 import ProductCard from '../../components/ProductCard';
-import ChatWidget from '../../components/ChatWidget';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
+import { FeedDonation, getFeedRequest } from '../../services/feedService';
 
 type FilterType = 'Todos' | 'Coleiras' | 'Rações' | 'Higiene';
 
 const CATEGORIES = [
-  { id: '1', name: 'Todos' },
-  { id: '2', name: 'Coleiras', icon: require('../../assets/images/coleiras.png') },
-  { id: '3', name: 'Rações',   icon: require('../../assets/images/racoes.png')  },
-  { id: '4', name: 'Higiene',  icon: require('../../assets/images/higiene.png') },
+  { id: '1', name: 'Todos' as FilterType },
+  { id: '2', name: 'Coleiras' as FilterType, icon: require('../../assets/images/coleiras.png') },
+  { id: '3', name: 'Rações' as FilterType,   icon: require('../../assets/images/racoes.png')  },
+  { id: '4', name: 'Higiene' as FilterType,  icon: require('../../assets/images/higiene.png') },
 ];
 
-// =====================================================================
-// MOCK DATA: Estrutura JSON preparada para (Leitura - GET)
-// =====================================================================
-const MOCK_DB_SECTIONS = [
-  {
-    category: 'Coleiras',
-    title: 'Doações Coleiras',
-    icon: require('../../assets/images/coleiras.png'),
-    products: [
-      { id: 'c1', title: 'Coleira vermelha tamanho 12', location: 'Sp centro',      condition: 'Usado' as const, imageUrl: 'https://photos.enjoei.com.br/coleira-para-cao-tamanho-grande-98635891/800x800/czM6Ly9waG90b3MuZW5qb2VpLmNvbS5ici9wcm9kdWN0cy8xODUzMDg5NS8zNTQ2ZTk2NmRkODUxMmIzYjY5YTBhZjhiYjE0YjQ2ZS5qcGc' },
-      { id: 'c2', title: 'Coleira preta de couro',      location: 'Guarulhos - sp', condition: 'Usado' as const, imageUrl: 'https://photos.enjoei.com.br/public/300x300/czM6Ly9waG90b3MuZW5qb2VpLmNvbS5ici9wcm9kdWN0cy8xMTYyNjc3NS9mNzZhMTAyYTI4MWIwMTEwMDQ1NGJjNTNhOGMwNzI3Zi5qcGc' },
-      { id: 'c3', title: 'Coleira azul tamanho 10',     location: 'Santos',         condition: 'Novo'  as const, imageUrl: 'https://photos.enjoei.com.br/coleira-pescoco-azul-com-laranja-meu-auau-92549493/800x800/czM6Ly9waG90b3MuZW5qb2VpLmNvbS5ici9wcm9kdWN0cy84NDI5MjE1LzVlNDRiZDFjY2M0ZDcxMzRmM2FhY2UyNTlmNmIyMTdlLmpwZw' },
-    ]
-  },
-  {
-    category: 'Rações',
-    title: 'Doações Rações',
-    icon: require('../../assets/images/racoes.png'),
-    products: [
-      { id: 'r1', title: 'Ração Golden 1kg',  location: 'Sp centro',   condition: 'Novo' as const, imageUrl: 'https://m.magazineluiza.com.br/a-static/420x420/racao-golden-formula-filhotes-frango-e-arroz-15-kg-premier/animavida/974283bc8f6311ec896f4201ac185055/12dc34f63997865f25149d7888f5fd23.jpeg' },
-      { id: 'r2', title: 'Ração Optimum 2kg', location: 'São Caetano', condition: 'Novo' as const, imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRs1MIBGUvz0p38ldqm7JReO7yXEQz2sgsd7w&s' },
-    ]
-  },
-  {
-    category: 'Higiene',
-    title: 'Doações Higiene',
-    icon: require('../../assets/images/higiene.png'),
-    products: [
-      { id: 'h1', title: 'Shampoo Neutro Pet Clean', location: 'Sp centro', condition: 'Novo' as const, imageUrl: 'https://petcleanbrasil.com.br/wp-content/uploads/2022/10/shampoo-neutro-para-caes-e-gatos-pet-clean-700-ml.jpg' },
-    ]
-  }
-];
-
-function getFilteredSections(activeFilter: FilterType) {
-  if (activeFilter === 'Todos') return MOCK_DB_SECTIONS;
-  return MOCK_DB_SECTIONS.filter(section => section.category === activeFilter);
+function groupByCategory(donations: FeedDonation[]): Record<string, FeedDonation[]> {
+  return donations.reduce<Record<string, FeedDonation[]>>((acc, d) => {
+    (acc[d.category] = acc[d.category] ?? []).push(d);
+    return acc;
+  }, {});
 }
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user, token } = useAuth();
   const [activeFilter, setActiveFilter] = useState<FilterType>('Todos');
+  const [donations, setDonations] = useState<FeedDonation[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const { user } = useAuth();
-  const firstName = user?.nome_completo ? user.nome_completo.split(' ')[0] : 'Visitante';
+  const firstName = user?.full_name ? user.full_name.split(' ')[0] : 'Visitante';
+
+  const loadFeed = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const res = await getFeedRequest(token, {
+        category: activeFilter !== 'Todos' ? activeFilter : undefined,
+        limit: 20,
+      });
+      setDonations(res.donations);
+    } catch {
+      setDonations([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, activeFilter]);
+
+  useEffect(() => { loadFeed(); }, [loadFeed]);
+
+  const grouped = groupByCategory(donations);
+  const sections =
+    activeFilter === 'Todos'
+      ? Object.entries(grouped)
+      : [[activeFilter, grouped[activeFilter] ?? []] as [string, FeedDonation[]]];
+
+  const categoryIcons: Record<string, any> = {
+    Coleiras: require('../../assets/images/coleiras.png'),
+    Rações:   require('../../assets/images/racoes.png'),
+    Higiene:  require('../../assets/images/higiene.png'),
+  };
 
   return (
     <View style={styles.mainContainer}>
       <MainHeader />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-        
+
         <View style={styles.banner}>
           <View style={styles.bannerInner}>
             <Text style={styles.bannerGreeting}>Olá, {firstName}</Text>
@@ -79,7 +81,11 @@ export default function HomeScreen() {
         <View style={styles.filtersWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScrollContent}>
             {CATEGORIES.map((cat) => (
-              <TouchableOpacity key={cat.id} style={[styles.filterPill, activeFilter === cat.name && styles.filterPillActive]} onPress={() => setActiveFilter(cat.name as FilterType)}>
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.filterPill, activeFilter === cat.name && styles.filterPillActive]}
+                onPress={() => setActiveFilter(cat.name)}
+              >
                 {'icon' in cat && <Image source={cat.icon} style={styles.filterIcon} />}
                 <Text style={[styles.filterText, activeFilter === cat.name && styles.filterTextActive]}>{cat.name}</Text>
               </TouchableOpacity>
@@ -88,28 +94,41 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.contentWrapper}>
-          {getFilteredSections(activeFilter).map(section => (
-            <View key={section.category} style={styles.sectionContainer}>
-              
-              <View style={styles.sectionHeader}>
-                <Image source={section.icon} style={styles.sectionIcon} />
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-              </View>
-              
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carouselContentContainer}>
-                {section.products.map(product => (
-                  <ProductCard
-                    key={product.id}
-                    title={product.title}
-                    location={product.location}
-                    condition={product.condition}
-                    imageUrl={product.imageUrl}
-                    onPress={() => router.push('/product')}
-                  />
-                ))}
-              </ScrollView>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
-          ))}
+          ) : sections.length === 0 || sections.every(([, items]) => items.length === 0) ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Nenhuma doação encontrada.</Text>
+            </View>
+          ) : (
+            sections.map(([category, items]) =>
+              items.length === 0 ? null : (
+                <View key={category} style={styles.sectionContainer}>
+                  <View style={styles.sectionHeader}>
+                    {categoryIcons[category] && (
+                      <Image source={categoryIcons[category]} style={styles.sectionIcon} />
+                    )}
+                    <Text style={styles.sectionTitle}>Doações {category}</Text>
+                  </View>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carouselContent}>
+                    {items.map(donation => (
+                      <ProductCard
+                        key={donation.id}
+                        title={donation.title}
+                        category={donation.category}
+                        imageUrl={donation.photo_url}
+                        in_wishlist={donation.in_wishlist}
+                        onPress={() => router.push({ pathname: '/product', params: { id: String(donation.id) } })}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              )
+            )
+          )}
         </View>
       </ScrollView>
 
@@ -122,28 +141,24 @@ const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: COLORS.backgroundGray },
   scrollContainer: { flexGrow: 1, paddingBottom: 60 },
   banner: { backgroundColor: COLORS.primary, paddingVertical: 30, paddingHorizontal: 20 },
-  filtersWrapper: { backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  bannerInner: { width: '100%', maxWidth: 1200, alignSelf: 'center', marginHorizontal: 'auto' },
+  bannerInner: { width: '100%', maxWidth: 1200, alignSelf: 'center' },
   bannerGreeting: { color: 'rgba(255,255,255,0.8)', fontSize: 16, marginBottom: 4 },
   bannerTitle: { color: '#FFF', fontSize: 26, fontWeight: 'bold', marginBottom: 8 },
   bannerSubtitle: { color: 'rgba(255,255,255,0.9)', fontSize: 16 },
-  filtersScrollContent: { 
-    flexGrow: 1, 
-    justifyContent: 'center', 
-    paddingHorizontal: 20, 
-    paddingVertical: 12, 
-    gap: 12 
-  },
-  
+  filtersWrapper: { backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  filtersScrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 12 },
   filterPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#FFF' },
   filterPillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   filterIcon: { width: 16, height: 16, marginRight: 6, resizeMode: 'contain' },
   filterText: { color: COLORS.textDark, fontWeight: '600' },
   filterTextActive: { color: '#FFF' },
-  contentWrapper: { width: '100%', maxWidth: 1200, alignSelf: 'center', marginHorizontal: 'auto', paddingVertical: 10 },
+  contentWrapper: { width: '100%', maxWidth: 1200, alignSelf: 'center', paddingVertical: 10 },
+  loadingContainer: { padding: 60, alignItems: 'center' },
+  emptyContainer: { padding: 60, alignItems: 'center' },
+  emptyText: { fontSize: 16, color: COLORS.textLight },
   sectionContainer: { marginBottom: 10 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16, marginTop: 10 },
   sectionIcon: { width: 20, height: 20, marginRight: 10, resizeMode: 'contain' },
   sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#000' },
-  carouselContentContainer: { paddingHorizontal: 20, paddingBottom: 10 }
+  carouselContent: { paddingHorizontal: 20, paddingBottom: 10 },
 });

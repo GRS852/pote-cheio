@@ -3,10 +3,10 @@ const API_URL = 'https://api.potecheio.site';
 export type Usuario = {
   id: number;
   email: string;
-  nome_completo: string;
-  data_nascimento: string;
-  criado_em: string;
-  telefone: string | null;
+  full_name: string;
+  birth_date: string | null;
+  created_at: string;
+  phone: string | null;
   cpf: string | null;
 };
 
@@ -40,55 +40,41 @@ export class ValidationError extends Error {
 
 export async function signInRequest(email: string, password: string) {
   let response: Response;
-
   try {
     response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, senha: password }),
+      body: JSON.stringify({ email, password }),
     });
   } catch {
-    // fetch lança TypeError quando há falha de rede (CORS, servidor off, sem internet)
     throw new NetworkError();
   }
 
-  if (response.status === 401 || response.status === 403) {
-    throw new AuthError();
-  }
+  if (response.status === 401 || response.status === 403) throw new AuthError();
+  if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
 
-  if (!response.ok) {
-    throw new NetworkError(`Erro no servidor (${response.status}). Tente novamente mais tarde.`);
-  }
-
-  const data = await response.json();
-
-  // Log temporário para diagnóstico — remover após confirmar o campo correto
-  console.log('[Auth] Resposta da API:', JSON.stringify(data));
-
-  return data; // espera { token: string, user: {...} }
+  return response.json();
 }
 
-export async function signUpRequest(name: string, email: string, password: string, birthDate: string) {
+export async function signUpRequest(
+  full_name: string,
+  email: string,
+  password: string,
+  birth_date: string
+) {
   let response: Response;
-
   try {
     response = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome_completo: name, email, senha: password, data_nascimento: birthDate }),
+      body: JSON.stringify({ full_name, email, password, birth_date }),
     });
   } catch {
-    // fetch lança TypeError quando há falha de rede (CORS, servidor off, sem internet)
     throw new NetworkError();
   }
 
-  if (response.status === 401 || response.status === 403) {
-    throw new AuthError();
-  }
-
-  if (response.status === 409) {
-    throw new ConflictError();
-  }
+  if (response.status === 401 || response.status === 403) throw new AuthError();
+  if (response.status === 409) throw new ConflictError();
 
   if (response.status === 400) {
     let msg = 'Dados inválidos. Verifique as informações e tente novamente.';
@@ -99,20 +85,13 @@ export async function signUpRequest(name: string, email: string, password: strin
     throw new ValidationError(msg);
   }
 
-  if (!response.ok) {
-    throw new NetworkError(`Erro no servidor (${response.status}). Tente novamente mais tarde.`);
-  }
+  if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
 
-  const data = await response.json();
-
-  console.log('[Auth] Resposta da API register:', JSON.stringify(data));
-
-  return data;
+  return response.json();
 }
 
 export async function getMeRequest(token: string): Promise<Usuario> {
   let response: Response;
-
   try {
     response = await fetch(`${API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -124,5 +103,5 @@ export async function getMeRequest(token: string): Promise<Usuario> {
   if (!response.ok) throw new NetworkError();
 
   const data = await response.json();
-  return data.usuario as Usuario;
+  return data.user as Usuario;
 }
