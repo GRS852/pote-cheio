@@ -1,41 +1,50 @@
+import { FontAwesome } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import MainHeader from '../../components/MainHeader';
-import ProfileUserInfo from '../../components/ProfileUserInfo';
-import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
 import DonationListItem from '../../components/DonationListItem';
+import MainHeader from '../../components/MainHeader';
+import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
+import ProfileUserInfo from '../../components/ProfileUserInfo';
 import { COLORS } from '../../constants/theme';
+import { useAuth } from '../../services/AuthContext';
 
 type TabType = 'Minhas doações' | 'Historia' | 'Favoritos';
 const TABS: TabType[] = ['Minhas doações', 'Historia', 'Favoritos'];
 
-const MOCK_USER_PROFILE = {
-  profile: {
-    name: "Wanessa Nunes",
-    avatarUrl: null, 
-    memberSince: "2023",
-    location: "São Paulo",
-    stats: [
-      { count: 20, label: 'Doações realizadas' }
-    ],
-    impact: { 
-      totalDonatedValue: "R$1.200,00", 
-      itemsDonatedCount: 48, 
-      animalsHelpedCount: 30 
-    }
-  },
-  donations: [
-    { id: '1', title: 'Coleira preta', receiver: 'Rafaela Santos', date: '15 de mai de 2024', status: 'Entregue' as const, imageUrl: require('../../assets/images/logo.png') },
-    { id: '2', title: 'Ração Golden', receiver: 'Guilherme santos', date: '15 de mai de 2024', status: 'Em andamento' as const, imageUrl: require('../../assets/images/logo.png') },
-  ],
-  favorites: [
-    require('../../assets/images/logo.png'), require('../../assets/images/logo.png')
-  ]
-};
+const MOCK_DONATIONS = [
+  { id: '1', title: 'Coleira preta', receiver: 'Rafaela Santos', date: '15 de mai de 2024', status: 'Entregue' as const, imageUrl: require('../../assets/images/logo.png') },
+  { id: '2', title: 'Ração Golden', receiver: 'Guilherme santos', date: '15 de mai de 2024', status: 'Em andamento' as const, imageUrl: require('../../assets/images/logo.png') },
+];
+
+const MOCK_FAVORITES = [
+  require('../../assets/images/logo.png'), require('../../assets/images/logo.png')
+];
 
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('Minhas doações');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { signOut, user } = useAuth();
+
+  const memberSince = user?.criado_em ? new Date(user.criado_em).getFullYear().toString() : '';
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sair da conta',
+      'Tem certeza que deseja sair?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLoggingOut(true);
+            await signOut();
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={styles.mainContainer}>
@@ -46,18 +55,18 @@ export default function ProfileScreen() {
           
           <Text style={styles.pageTitle}>Meu <Text style={{ color: COLORS.secondary }}>Perfil</Text></Text>
 
-          <ProfileUserInfo 
-            name={MOCK_USER_PROFILE.profile.name}
-            avatarUrl={MOCK_USER_PROFILE.profile.avatarUrl}
-            memberSince={MOCK_USER_PROFILE.profile.memberSince}
-            location={MOCK_USER_PROFILE.profile.location}
-            stats={MOCK_USER_PROFILE.profile.stats}
+          <ProfileUserInfo
+            name={user?.nome_completo ?? ''}
+            avatarUrl={null}
+            memberSince={memberSince}
+            location=""
+            stats={[]}
           />
 
-          <ProfileImpactMetrics 
-            totalDonatedValue={MOCK_USER_PROFILE.profile.impact.totalDonatedValue}
-            itemsDonatedCount={MOCK_USER_PROFILE.profile.impact.itemsDonatedCount}
-            animalsHelpedCount={MOCK_USER_PROFILE.profile.impact.animalsHelpedCount}
+          <ProfileImpactMetrics
+            totalDonatedValue="R$0,00"
+            itemsDonatedCount={0}
+            animalsHelpedCount={0}
           />
 
           <View style={styles.tabsContainer}>
@@ -76,7 +85,7 @@ export default function ProfileScreen() {
           <View style={styles.tabContentCard}>
             {activeTab === 'Minhas doações' && (
               <View>
-                {MOCK_USER_PROFILE.donations.map((donation) => (
+                {MOCK_DONATIONS.map((donation) => (
                   <DonationListItem key={donation.id} {...donation} />
                 ))}
               </View>
@@ -90,7 +99,7 @@ export default function ProfileScreen() {
 
             {activeTab === 'Favoritos' && (
               <View style={styles.favoritesGrid}>
-                {MOCK_USER_PROFILE.favorites.map((img, index) => (
+                {MOCK_FAVORITES.map((img, index) => (
                   <View key={index} style={styles.favoriteImageContainer}>
                     <Image source={img} style={styles.favoriteImage} resizeMode="cover" />
                   </View>
@@ -98,6 +107,22 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
+
+          <TouchableOpacity
+            style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+            disabled={isLoggingOut}
+          >
+            {isLoggingOut ? (
+              <ActivityIndicator color="#C0392B" size="small" />
+            ) : (
+              <>
+                <FontAwesome name="sign-out" size={18} color="#C0392B" />
+                <Text style={styles.logoutText}>Sair da conta</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
         </View>
       </ScrollView>
@@ -121,4 +146,18 @@ const styles = StyleSheet.create({
   favoriteImage: { width: '100%', height: '100%' },
   emptyStateContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyStateText: { fontSize: 16, color: COLORS.textLight },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#C0392B',
+    backgroundColor: '#FFF5F5',
+  },
+  logoutButtonDisabled: { opacity: 0.6 },
+  logoutText: { fontSize: 16, fontWeight: '600', color: '#C0392B' },
 });

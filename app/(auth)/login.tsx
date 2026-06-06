@@ -7,15 +7,46 @@ import AuthHeader from '../../components/AuthHeader';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { COLORS } from '../../constants/theme';
+import { AuthError, NetworkError } from '../../services/authService';
+import { useAuth } from '../../services/AuthContext';
 
 export default function LoginScreen() {
   const [form, setForm] = useState({ email: '', password: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const { width } = useWindowDimensions();
-  const isDesktop = width >= 768; 
+  const isDesktop = width >= 768;
+  const { signIn } = useAuth();
 
   const handleChange = (field: keyof typeof form, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }))
-  }
+    setForm(prev => ({ ...prev, [field]: value }));
+    if (error) setError('');
+  };
+
+  const handleLogin = async () => {
+    if (!form.email || !form.password) {
+      setError('Preencha o e-mail e a senha.');
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      await signIn(form.email, form.password);
+      // O RouteGuard detecta isAuthenticated = true e redireciona para /(app)/home automaticamente
+    } catch (err) {
+      if (err instanceof NetworkError) {
+        setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
+      } else if (err instanceof AuthError) {
+        setError('E-mail ou senha inválidos. Tente novamente.');
+      } else {
+        // Erro inesperado: exibe a mensagem real para facilitar o diagnóstico
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[Login] Erro inesperado:', msg);
+        setError(`Erro inesperado: ${msg}`);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView style={styles.mainContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -43,7 +74,8 @@ export default function LoginScreen() {
               <Link href="/recover" style={styles.forgotPasswordText}>Esqueci minha senha</Link>
             </View>
 
-            <Button title="Entrar" onPress={() => console.log('Login Form:', form)} />
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <Button title="Entrar" onPress={handleLogin} loading={isSubmitting} disabled={isSubmitting} />
 
             <View style={styles.dividerContainer}>
               <View style={styles.divider} />
@@ -104,5 +136,6 @@ const styles = StyleSheet.create({
   registerText: { textAlign: 'center', marginTop: 24, fontSize: 16 },
   registerLink: { color: COLORS.secondary, fontWeight: 'bold' },
   termsText: { textAlign: 'center', marginTop: 16, fontSize: 12, color: COLORS.textDark },
-  linkText: { color: COLORS.secondary }
+  linkText: { color: COLORS.secondary },
+  errorText: { color: '#D32F2F', fontSize: 14, textAlign: 'center', marginBottom: 4 },
 });

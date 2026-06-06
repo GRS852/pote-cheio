@@ -6,6 +6,7 @@ import MainHeader from '../../components/MainHeader';
 import ProductCard from '../../components/ProductCard';
 import ChatWidget from '../../components/ChatWidget';
 import { COLORS } from '../../constants/theme';
+import { useAuth } from '../../services/AuthContext';
 
 type FilterType = 'Todos' | 'Coleiras' | 'Rações' | 'Higiene';
 
@@ -15,18 +16,6 @@ const CATEGORIES = [
   { id: '3', name: 'Rações',   icon: require('../../assets/images/racoes.png')  },
   { id: '4', name: 'Higiene',  icon: require('../../assets/images/higiene.png') },
 ];
-
-// =====================================================================
-// (integração para o Back-end)
-// =====================================================================
-const useAuth = () => {
-  return {
-    user: {
-      name: "Wanessa Nunes", // O banco manda o nome do usuário logado
-      avatarUrl: null, 
-    }
-  };
-};
 
 // =====================================================================
 // MOCK DATA: Estrutura JSON preparada para (Leitura - GET)
@@ -70,11 +59,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<FilterType>('Todos');
 
-  // Consome os dados do usuário logado (integração com o Back-end)
   const { user } = useAuth();
-  
-  // Extrai apenas o primeiro nome 
-  const firstName = user?.name ? user.name.split(' ')[0] : 'Visitante';
+  const firstName = user?.nome_completo ? user.nome_completo.split(' ')[0] : 'Visitante';
 
   return (
     <View style={styles.mainContainer}>
