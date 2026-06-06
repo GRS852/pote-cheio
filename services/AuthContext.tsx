@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { signInRequest, signUpRequest } from './authService';
+import { getMeRequest, signInRequest, signUpRequest, Usuario } from './authService';
 
 // Funções de armazenamento multiplataforma
 async function saveToken(token: string) {
@@ -31,6 +31,7 @@ async function removeToken() {
 type AuthContextType = {
   isAuthenticated: boolean;
   isLoading: boolean;
+  user: Usuario | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string, birthDate: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -41,11 +42,20 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<Usuario | null>(null);
 
   useEffect(() => {
     async function loadToken() {
       const token = await getToken();
-      setIsAuthenticated(!!token);
+      if (token) {
+        try {
+          const usuario = await getMeRequest(token);
+          setUser(usuario);
+          setIsAuthenticated(true);
+        } catch {
+          await removeToken();
+        }
+      }
       setIsLoading(false);
     }
     loadToken();
@@ -54,7 +64,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signUp(name: string, email: string, password: string, birthDate: string) {
     const data = await signUpRequest(name, email, password, birthDate);
 
-    // Suporte a diferentes nomes de campo que a API pode usar para o token
     const token: string | undefined = data.token ?? data.access_token ?? data.jwt ?? data.authToken;
 
     if (!token) {
@@ -64,14 +73,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await saveToken(token);
+    const usuario = await getMeRequest(token);
+    setUser(usuario);
     setIsAuthenticated(true);
   }
-
 
   async function signIn(email: string, password: string) {
     const data = await signInRequest(email, password);
 
-    // Suporte a diferentes nomes de campo que a API pode usar para o token
     const token: string | undefined = data.token ?? data.access_token ?? data.jwt ?? data.authToken;
 
     if (!token) {
@@ -81,16 +90,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await saveToken(token);
+    const usuario = await getMeRequest(token);
+    setUser(usuario);
     setIsAuthenticated(true);
   }
 
   async function signOut() {
     await removeToken();
+    setUser(null);
     setIsAuthenticated(false);
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

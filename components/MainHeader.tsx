@@ -1,31 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { useRouter } from 'expo-router'; 
+import { useRouter } from 'expo-router';
 import { COLORS } from '../constants/theme';
-
-// =====================================================================
-// (Ponto de integração para o Back-end)
-// =====================================================================
-const useAuth = () => {
-  return {
-    user: {
-      name: "Wanessa Nunes", // O banco manda o nome do usuário logado
-      avatarUrl: null, // Se o banco mandar o link da foto, o layout muda sozinho
-    }
-  };
-};
+import { useAuth } from '../services/AuthContext';
 
 export default function MainHeader() {
-  const router = useRouter(); 
+  const router = useRouter();
   const { width } = useWindowDimensions();
-  const isMobile = width < 768; // Definição de limite para telas de celular
-  
-//O Header consome os dados do usuário logado dinamicamente
+  const isMobile = width < 768;
+
   const { user } = useAuth();
 
-  //Pega a primeira letra do nome que veio do banco
-  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
+  const userInitial = user?.nome_completo ? user.nome_completo.charAt(0).toUpperCase() : '?';
 
   return (
     <View style={styles.container}>
@@ -52,16 +39,12 @@ export default function MainHeader() {
         <TouchableOpacity style={styles.iconButton}><FontAwesome name="bell-o" size={20} color={COLORS.secondary} /></TouchableOpacity>
         
         {/* Se tem foto, mostra a foto. Se não tem, mostra a letra. */}
-        <TouchableOpacity 
-          style={styles.avatarContainer} 
-          onPress={() => router.push('/profile')} 
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={() => router.push('/profile')}
           activeOpacity={0.8}
         >
-          {user?.avatarUrl ? (
-             <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
-          ) : (
-             <Text style={styles.avatarText}>{userInitial}</Text>
-          )}
+          <Text style={styles.avatarText}>{userInitial}</Text>
         </TouchableOpacity>
       </View>
     </View>

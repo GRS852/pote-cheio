@@ -1,5 +1,15 @@
 const API_URL = 'https://api.potecheio.site';
 
+export type Usuario = {
+  id: number;
+  email: string;
+  nome_completo: string;
+  data_nascimento: string;
+  criado_em: string;
+  telefone: string | null;
+  cpf: string | null;
+};
+
 export class NetworkError extends Error {
   constructor(message = 'Falha de conexão com o servidor.') {
     super(message);
@@ -65,7 +75,7 @@ export async function signUpRequest(name: string, email: string, password: strin
     response = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, senha: password, birthDate }),
+      body: JSON.stringify({ nome_completo: name, email, senha: password, data_nascimento: birthDate }),
     });
   } catch {
     // fetch lança TypeError quando há falha de rede (CORS, servidor off, sem internet)
@@ -98,4 +108,21 @@ export async function signUpRequest(name: string, email: string, password: strin
   console.log('[Auth] Resposta da API register:', JSON.stringify(data));
 
   return data;
+}
+
+export async function getMeRequest(token: string): Promise<Usuario> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new NetworkError();
+  }
+
+  if (!response.ok) throw new NetworkError();
+
+  const data = await response.json();
+  return data.usuario as Usuario;
 }
