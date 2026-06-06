@@ -19,6 +19,7 @@ import MainHeader from '../../components/MainHeader';
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import { Category, createDonationRequest } from '../../services/donationService';
+import { supabase } from '../../services/supabaseClient';
 
 const CATEGORIES: Category[] = ['Coleiras', 'Rações', 'Higiene'];
 
@@ -54,11 +55,26 @@ export default function DonateScreen() {
 
     setLoading(true);
     try {
+      let finalPhotoUrl: string | null = null;
+
+      if (photoUri) {
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+        const blob = await fetch(photoUri).then(r => r.blob());
+        const { error: uploadError } = await supabase.storage
+          .from('imagens-potecheio')
+          .upload(fileName, blob);
+        if (uploadError) throw new Error(uploadError.message);
+        const { data } = supabase.storage
+          .from('imagens-potecheio')
+          .getPublicUrl(fileName);
+        finalPhotoUrl = data.publicUrl;
+      }
+
       await createDonationRequest(token, {
         title,
         category,
         description,
-        photo_url: photoUri,
+        photo_url: finalPhotoUrl,
         quantity: quantity ? Number(quantity) : null,
       });
       router.replace('/home');

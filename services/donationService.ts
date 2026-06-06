@@ -33,33 +33,19 @@ export async function createDonationRequest(
   token: string,
   payload: CreateDonationPayload
 ): Promise<Donation> {
-  let body: BodyInit;
-  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
-
-  if (payload.photo_url) {
-    const formData = new FormData();
-    formData.append('title', payload.title);
-    formData.append('category', payload.category);
-    formData.append('description', payload.description);
-    if (payload.quantity != null) formData.append('quantity', String(payload.quantity));
-
-    const filename = payload.photo_url.split('/').pop() ?? 'foto.jpg';
-    formData.append('photo', { uri: payload.photo_url, name: filename, type: 'image/jpeg' } as any);
-    body = formData;
-  } else {
-    headers['Content-Type'] = 'application/json';
-    body = JSON.stringify({
+  const response = await fetch(`${API_URL}/donations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
       title: payload.title,
       category: payload.category,
       description: payload.description,
       quantity: payload.quantity,
-    });
-  }
-
-  const response = await fetch(`${API_URL}/donations`, {
-    method: 'POST',
-    headers,
-    body,
+      photo_url: payload.photo_url ?? null,
+    }),
   });
 
   if (!response.ok) {

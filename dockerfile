@@ -7,6 +7,14 @@ RUN npm install
 
 COPY . .
 
+# Declara os argumentos que vêm do GitHub Actions
+ARG EXPO_PUBLIC_SUPABASE_URL
+ARG EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+# Converte em variáveis de ambiente para o expo export enxergar
+ENV EXPO_PUBLIC_SUPABASE_URL=$EXPO_PUBLIC_SUPABASE_URL
+ENV EXPO_PUBLIC_SUPABASE_ANON_KEY=$EXPO_PUBLIC_SUPABASE_ANON_KEY
+
 RUN npx expo export --platform web
 
 FROM nginx:alpine
