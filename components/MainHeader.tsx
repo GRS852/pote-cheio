@@ -1,17 +1,58 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { Image } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { useAuth } from '../services/AuthContext';
-import { getNotificationsRequest } from '../services/notificationService';
+import {
+  AppNotification,
+  getNotificationsRequest,
+  markAllReadRequest,
+} from '../services/notificationService';
+
+function timeAgo(dateStr: string): string {
+  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+  if (diff < 60) return 'agora';
+  if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
+
+function notifIconInfo(type: string): { name: string; color: string; bg: string } {
+  switch (type) {
+    case 'wishlist':
+    case 'interest':
+      return { name: 'heart', color: '#FE6C00', bg: 'rgba(254,108,0,0.12)' };
+    case 'message':
+      return { name: 'comment', color: COLORS.primary, bg: 'rgba(18,128,42,0.12)' };
+    case 'donation':
+      return { name: 'gift', color: '#8E44AD', bg: 'rgba(142,68,173,0.12)' };
+    default:
+      return { name: 'bell', color: COLORS.textLight, bg: 'rgba(0,0,0,0.06)' };
+  }
+}
 
 export default function MainHeader() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const { user, token } = useAuth();
+
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
 
   const userInitial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : '?';
 
@@ -22,26 +63,109 @@ export default function MainHeader() {
       .catch(() => {});
   }, [token]);
 
+  function handleBellPress() {
+    if (!token) return;
+    setShowNotifPanel(true);
+    setNotifLoading(true);
+    getNotificationsRequest(token)
+      .then(res => { setNotifications(res.notifications); setUnreadCount(res.unread); })
+      .catch(() => {})
+      .finally(() => setNotifLoading(false));
+  }
+
+  async function handleMarkAllRead() {
+    if (!token) return;
+    try {
+      await markAllReadRequest(token);
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch {}
+  }
+
   return (
     <View style={styles.container}>
+      <Modal
+        visible={showNotifPanel}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNotifPanel(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowNotifPanel(false)}
+        >
+          <TouchableOpacity
+            style={[styles.notifPanel, { width: Math.min(360, width - 32) }]}
+            activeOpacity={1}
+            onPress={() => {}}
+          >
+            <View style={styles.notifPanelHeader}>
+              <Text style={styles.notifPanelTitle}>Notificações</Text>
+              {unreadCount > 0 && (
+                <TouchableOpacity onPress={handleMarkAllRead} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={styles.markAllReadText}>Marcar todas como lidas</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {notifLoading ? (
+              <ActivityIndicator color={COLORS.primary} style={{ padding: 32 }} />
+            ) : notifications.length === 0 ? (
+              <View style={styles.notifEmpty}>
+                <FontAwesome name="bell-o" size={36} color={COLORS.textLight} />
+                <Text style={styles.notifEmptyText}>Nenhuma notificação</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.notifList} showsVerticalScrollIndicator={false}>
+                {notifications.map(n => {
+                  const icon = notifIconInfo(n.type);
+                  return (
+                    <View key={n.id} style={[styles.notifItem, !n.read && styles.notifItemUnread]}>
+                      <View style={[styles.notifIconBox, { backgroundColor: icon.bg }]}>
+                        <FontAwesome name={icon.name as any} size={16} color={icon.color} />
+                      </View>
+                      <View style={styles.notifContent}>
+                        <Text style={styles.notifItemTitle} numberOfLines={1}>{n.title}</Text>
+                        <Text style={styles.notifItemMsg} numberOfLines={2}>{n.message}</Text>
+                        <Text style={styles.notifItemTime}>{timeAgo(n.created_at)}</Text>
+                      </View>
+                      {!n.read && <View style={styles.unreadDot} />}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       <TouchableOpacity style={styles.leftSection} onPress={() => router.push('/home')} activeOpacity={0.7}>
         <Image source={require('../assets/images/logo.png')} style={styles.logoIcon} resizeMode="contain" />
       </TouchableOpacity>
 
       <View style={styles.searchContainer}>
-        <TextInput style={styles.searchInput} placeholder="Procure itens" placeholderTextColor={COLORS.textDark} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Procure itens"
+          placeholderTextColor={COLORS.textDark}
+        />
         <FontAwesome name="search" size={16} color={COLORS.textDark} style={styles.searchIcon} />
       </View>
 
       <View style={[styles.rightSection, { gap: isMobile ? 12 : 20 }]}>
         {!isMobile && (
           <>
-            <TouchableOpacity><Text style={styles.linkVerde}>Doações</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/donate')}><Text style={styles.linkVerde}>Quero doar</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/home')}>
+              <Text style={styles.linkVerde}>Doações</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/donate')}>
+              <Text style={styles.linkVerde}>Quero doar</Text>
+            </TouchableOpacity>
           </>
         )}
 
-        <TouchableOpacity style={styles.iconButton} onPress={() => {}}>
+        <TouchableOpacity style={styles.iconButton} onPress={handleBellPress}>
           <FontAwesome name="bell-o" size={20} color={COLORS.secondary} />
           {unreadCount > 0 && (
             <View style={styles.notifBadge}>
@@ -50,7 +174,11 @@ export default function MainHeader() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.avatarContainer} onPress={() => router.push('/profile')} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={() => router.push('/profile')}
+          activeOpacity={0.8}
+        >
           <Text style={styles.avatarText}>{userInitial}</Text>
         </TouchableOpacity>
       </View>
@@ -59,17 +187,124 @@ export default function MainHeader() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: COLORS.background, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
   leftSection: { flexDirection: 'row', alignItems: 'center' },
   logoIcon: { height: 40, width: 40 },
-  searchContainer: { flex: 1, maxWidth: 400, marginHorizontal: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBackground, borderRadius: 8, paddingHorizontal: 12, overflow: 'hidden' },
+  searchContainer: {
+    flex: 1,
+    maxWidth: 400,
+    marginHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.inputBackground,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    overflow: 'hidden',
+  },
   searchInput: { flex: 1, paddingVertical: 8, fontSize: 14, color: '#000', outlineStyle: 'none' as any },
   searchIcon: { marginLeft: 8 },
   rightSection: { flexDirection: 'row', alignItems: 'center' },
   linkVerde: { color: COLORS.primary, fontSize: 16, fontWeight: '500' },
   iconButton: { padding: 4, position: 'relative' },
-  notifBadge: { position: 'absolute', top: 0, right: 0, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#C0392B', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  notifBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#C0392B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
   notifBadgeText: { color: '#FFF', fontSize: 9, fontWeight: 'bold' },
-  avatarContainer: { width: 35, height: 35, borderRadius: 17.5, backgroundColor: COLORS.secondary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarContainer: {
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
+    backgroundColor: COLORS.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
   avatarText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+
+  // Modal overlay
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 62,
+    paddingRight: 16,
+  },
+
+  // Notification panel
+  notifPanel: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    maxHeight: 480,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 16,
+    overflow: 'hidden',
+  },
+  notifPanelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  notifPanelTitle: { fontSize: 16, fontWeight: 'bold', color: '#000' },
+  markAllReadText: { fontSize: 13, color: COLORS.primary, fontWeight: '600' },
+  notifList: { maxHeight: 400 },
+  notifItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    gap: 12,
+  },
+  notifItemUnread: { backgroundColor: 'rgba(18,128,42,0.04)' },
+  notifIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  notifContent: { flex: 1 },
+  notifItemTitle: { fontSize: 14, fontWeight: '700', color: '#000', marginBottom: 2 },
+  notifItemMsg: { fontSize: 13, color: COLORS.textDark, lineHeight: 18 },
+  notifItemTime: { fontSize: 11, color: COLORS.textLight, marginTop: 4 },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.primary,
+    marginTop: 5,
+    flexShrink: 0,
+  },
+  notifEmpty: { padding: 40, alignItems: 'center', gap: 12 },
+  notifEmptyText: { fontSize: 14, color: COLORS.textLight },
 });

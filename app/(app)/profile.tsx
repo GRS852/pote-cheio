@@ -1,13 +1,31 @@
 import { FontAwesome } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import MainHeader from '../../components/MainHeader';
 import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
 import ProfileUserInfo from '../../components/ProfileUserInfo';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
-import { Donation, getMyDonationsRequest } from '../../services/donationService';
+import {
+  Donation,
+  DonationStatus,
+  InterestedUser,
+  deleteDonationRequest,
+  getInterestedUsersRequest,
+  getMyDonationsRequest,
+  updateDonationStatusRequest,
+  confirmDonationRequest,
+} from '../../services/donationService';
 
 type TabType = 'Minhas doações' | 'Historia' | 'Favoritos';
 const TABS: TabType[] = ['Minhas doações', 'Historia', 'Favoritos'];
@@ -20,8 +38,16 @@ const MOCK_FAVORITES = [
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('Minhas doações');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [myDonations, setMyDonations] = useState<Donation[]>([]);
   const [donationsLoading, setDonationsLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  // Confirm donation modal
+  const [confirmModalDonationId, setConfirmModalDonationId] = useState<number | null>(null);
+  const [interestedUsers, setInterestedUsers] = useState<InterestedUser[]>([]);
+  const [interestedLoading, setInterestedLoading] = useState(false);
+
   const { signOut, user, token } = useAuth();
 
   const memberSince = user?.created_at ? new Date(user.created_at).getFullYear().toString() : '';
@@ -35,11 +61,56 @@ export default function ProfileScreen() {
       .finally(() => setDonationsLoading(false));
   }, [activeTab, token]);
 
-  function handleLogout() {
-    Alert.alert('Sair da conta', 'Tem certeza que deseja sair?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: async () => { setIsLoggingOut(true); await signOut(); } },
-    ]);
+  async function handleLogout() {
+    setIsLoggingOut(true);
+    await signOut();
+  }
+
+  async function handleStatusChange(donationId: number, status: DonationStatus) {
+    if (!token) return;
+    setActionError('');
+    try {
+      const updated = await updateDonationStatusRequest(token, donationId, status);
+      setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: updated.status } : d));
+    } catch {
+      setActionError('Não foi possível atualizar o status.');
+    }
+  }
+
+  async function handleDeleteDonation(donationId: number) {
+    if (!token) return;
+    setActionError('');
+    try {
+      await deleteDonationRequest(token, donationId);
+      setMyDonations(prev => prev.filter(d => d.id !== donationId));
+    } catch {
+      setActionError('Não foi possível excluir a doação.');
+    }
+  }
+
+  async function handleOpenConfirmModal(donationId: number) {
+    if (!token) return;
+    setConfirmModalDonationId(donationId);
+    setInterestedLoading(true);
+    try {
+      const users = await getInterestedUsersRequest(token, donationId);
+      setInterestedUsers(users);
+    } catch {
+      setInterestedUsers([]);
+    } finally {
+      setInterestedLoading(false);
+    }
+  }
+
+  async function handleConfirmToUser(donationId: number, userId: number) {
+    if (!token) return;
+    try {
+      const updated = await confirmDonationRequest(token, donationId, userId);
+      setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: updated.status } : d));
+      setConfirmModalDonationId(null);
+    } catch {
+      setActionError('Não foi possível confirmar a doação.');
+    }
   }
 
   const statusLabel = (s: string) =>
@@ -51,10 +122,60 @@ export default function ProfileScreen() {
     <View style={styles.mainContainer}>
       <MainHeader />
 
+      {/* Modal: escolher usuário para confirmar doação */}
+      <Modal
+        visible={confirmModalDonationId != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmModalDonationId(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setConfirmModalDonationId(null)}
+        >
+          <TouchableOpacity style={styles.confirmModalBox} activeOpacity={1} onPress={() => {}}>
+            <Text style={styles.confirmModalTitle}>Concluir para quem?</Text>
+            <Text style={styles.confirmModalSubtitle}>Selecione o usuário que receberá a doação</Text>
+
+            {interestedLoading ? (
+              <ActivityIndicator color={COLORS.primary} style={{ padding: 20 }} />
+            ) : interestedUsers.length === 0 ? (
+              <Text style={styles.confirmModalEmpty}>Nenhum usuário demonstrou interesse ainda.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 280 }}>
+                {interestedUsers.map(u => (
+                  <TouchableOpacity
+                    key={u.user_id}
+                    style={styles.interestedUserItem}
+                    onPress={() => handleConfirmToUser(confirmModalDonationId!, u.user_id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.interestedAvatar}>
+                      <Text style={styles.interestedAvatarText}>
+                        {u.full_name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.interestedUserName}>{u.full_name}</Text>
+                    <FontAwesome name="check-circle" size={18} color={COLORS.primary} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            <TouchableOpacity style={styles.confirmModalClose} onPress={() => setConfirmModalDonationId(null)}>
+              <Text style={styles.confirmModalCloseText}>Cancelar</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.contentWrapper}>
 
-          <Text style={styles.pageTitle}>Meu <Text style={{ color: COLORS.secondary }}>Perfil</Text></Text>
+          <Text style={styles.pageTitle}>
+            Meu <Text style={{ color: COLORS.secondary }}>Perfil</Text>
+          </Text>
 
           <ProfileUserInfo
             name={user?.full_name ?? ''}
@@ -92,26 +213,63 @@ export default function ProfileScreen() {
                   <Text style={styles.emptyStateText}>Você ainda não publicou nenhuma doação.</Text>
                 </View>
               ) : (
-                myDonations.map(d => (
-                  <View key={d.id} style={styles.donationItem}>
-                    {d.photo_url ? (
-                      <Image source={{ uri: d.photo_url }} style={styles.donationImage} />
-                    ) : (
-                      <View style={[styles.donationImage, styles.donationImagePlaceholder]}>
-                        <FontAwesome name="image" size={20} color={COLORS.textLight} />
+                <>
+                  {actionError ? (
+                    <Text style={styles.actionError}>{actionError}</Text>
+                  ) : null}
+                  {myDonations.map(d => (
+                    <View key={d.id} style={styles.donationItem}>
+                      <View style={styles.donationRow}>
+                        {d.photo_url ? (
+                          <Image source={{ uri: d.photo_url }} style={styles.donationImage} />
+                        ) : (
+                          <View style={[styles.donationImage, styles.donationImagePlaceholder]}>
+                            <FontAwesome name="image" size={20} color={COLORS.textLight} />
+                          </View>
+                        )}
+                        <View style={styles.donationInfo}>
+                          <Text style={styles.donationTitle} numberOfLines={1}>{d.title}</Text>
+                          <Text style={styles.donationCategory}>{d.category}</Text>
+                        </View>
+                        <View style={[styles.donationStatus, { borderColor: statusColor(d.status) }]}>
+                          <Text style={[styles.donationStatusText, { color: statusColor(d.status) }]}>
+                            {statusLabel(d.status)}
+                          </Text>
+                        </View>
                       </View>
-                    )}
-                    <View style={styles.donationInfo}>
-                      <Text style={styles.donationTitle} numberOfLines={1}>{d.title}</Text>
-                      <Text style={styles.donationCategory}>{d.category}</Text>
+
+                      <View style={styles.donationActions}>
+                        {d.status === 'available' && (
+                          <TouchableOpacity
+                            style={styles.actionChip}
+                            onPress={() => handleStatusChange(d.id, 'reserved')}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.actionChipText}>Reservar</Text>
+                          </TouchableOpacity>
+                        )}
+                        {d.status !== 'completed' && (
+                          <TouchableOpacity
+                            style={[styles.actionChip, styles.actionChipGreen]}
+                            onPress={() => handleOpenConfirmModal(d.id)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.actionChipText, styles.actionChipTextGreen]}>
+                              Concluir
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={[styles.actionChip, styles.actionChipDanger]}
+                          onPress={() => handleDeleteDonation(d.id)}
+                          activeOpacity={0.7}
+                        >
+                          <FontAwesome name="trash-o" size={13} color="#C0392B" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <View style={[styles.donationStatus, { borderColor: statusColor(d.status) }]}>
-                      <Text style={[styles.donationStatusText, { color: statusColor(d.status) }]}>
-                        {statusLabel(d.status)}
-                      </Text>
-                    </View>
-                  </View>
-                ))
+                  ))}
+                </>
               )
             )}
 
@@ -132,21 +290,39 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          <TouchableOpacity
-            style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
-            onPress={handleLogout}
-            activeOpacity={0.7}
-            disabled={isLoggingOut}
-          >
-            {isLoggingOut ? (
-              <ActivityIndicator color="#C0392B" size="small" />
-            ) : (
-              <>
-                <FontAwesome name="sign-out" size={18} color="#C0392B" />
-                <Text style={styles.logoutText}>Sair da conta</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {showLogoutConfirm ? (
+            <View style={styles.logoutConfirmBox}>
+              <Text style={styles.logoutConfirmQuestion}>Tem certeza que deseja sair?</Text>
+              <View style={styles.logoutConfirmButtons}>
+                <TouchableOpacity
+                  style={styles.logoutCancelBtn}
+                  onPress={() => setShowLogoutConfirm(false)}
+                >
+                  <Text style={styles.logoutCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.logoutConfirmBtn, isLoggingOut && { opacity: 0.6 }]}
+                  onPress={handleLogout}
+                  disabled={isLoggingOut}
+                >
+                  {isLoggingOut ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <Text style={styles.logoutConfirmBtnText}>Sim, sair</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={() => setShowLogoutConfirm(true)}
+              activeOpacity={0.7}
+            >
+              <FontAwesome name="sign-out" size={18} color="#C0392B" />
+              <Text style={styles.logoutText}>Sair da conta</Text>
+            </TouchableOpacity>
+          )}
 
         </View>
       </ScrollView>
@@ -159,26 +335,213 @@ const styles = StyleSheet.create({
   scrollContainer: { flexGrow: 1, paddingBottom: 60 },
   contentWrapper: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: 30 },
   pageTitle: { fontSize: 24, fontWeight: 'bold', color: '#000', marginBottom: 20 },
-  tabsContainer: { flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: COLORS.border, marginBottom: 20 },
-  tabButton: { paddingVertical: 12, paddingHorizontal: 20, borderBottomWidth: 3, borderBottomColor: 'transparent', marginBottom: -2 },
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.border,
+    marginBottom: 20,
+  },
+  tabButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+    marginBottom: -2,
+  },
   tabButtonActive: { borderBottomColor: COLORS.primary },
   tabText: { fontSize: 18, fontWeight: 'bold', color: COLORS.textLight },
   tabTextActive: { color: COLORS.primary },
-  tabContentCard: { backgroundColor: '#FFF', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  tabContentCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
   emptyStateContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyStateText: { fontSize: 16, color: COLORS.textLight },
-  donationItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  donationImage: { width: 52, height: 52, borderRadius: 8, backgroundColor: COLORS.border, marginRight: 12 },
+
+  // Donation items
+  donationItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    paddingVertical: 12,
+  },
+  donationRow: { flexDirection: 'row', alignItems: 'center' },
+  donationImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    backgroundColor: COLORS.border,
+    marginRight: 12,
+  },
   donationImagePlaceholder: { justifyContent: 'center', alignItems: 'center' },
   donationInfo: { flex: 1 },
   donationTitle: { fontSize: 14, fontWeight: 'bold', color: '#000', marginBottom: 2 },
   donationCategory: { fontSize: 12, color: COLORS.textLight },
   donationStatus: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   donationStatusText: { fontSize: 11, fontWeight: 'bold' },
+
+  // Action buttons row
+  donationActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(217,217,217,0.5)',
+  },
+  actionChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#FAFAFA',
+  },
+  actionChipText: { fontSize: 12, fontWeight: '600', color: COLORS.textDark },
+  actionChipGreen: { borderColor: '#27AE60', backgroundColor: 'rgba(39,174,96,0.08)' },
+  actionChipTextGreen: { color: '#27AE60' },
+  actionChipDanger: {
+    borderColor: '#C0392B',
+    backgroundColor: 'rgba(192,57,43,0.06)',
+    paddingHorizontal: 10,
+  },
+  actionError: { color: '#C0392B', fontSize: 13, textAlign: 'center', marginBottom: 12 },
+
+  // Favorites grid
   favoritesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  favoriteImageContainer: { width: '31%', minWidth: 120, aspectRatio: 1.5, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border },
+  favoriteImageContainer: {
+    width: '31%',
+    minWidth: 120,
+    aspectRatio: 1.5,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
   favoriteImage: { width: '100%', height: '100%' },
-  logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 32, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#C0392B', backgroundColor: '#FFF5F5' },
-  logoutButtonDisabled: { opacity: 0.6 },
+
+  // Logout
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#C0392B',
+    backgroundColor: '#FFF5F5',
+  },
   logoutText: { fontSize: 16, fontWeight: '600', color: '#C0392B' },
+  logoutConfirmBox: {
+    marginTop: 32,
+    padding: 20,
+    backgroundColor: '#FFF5F5',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#C0392B',
+  },
+  logoutConfirmQuestion: {
+    fontSize: 15,
+    color: '#C0392B',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontWeight: '600',
+  },
+  logoutConfirmButtons: { flexDirection: 'row', gap: 12 },
+  logoutCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
+  logoutCancelText: { fontSize: 15, color: COLORS.textDark, fontWeight: '600' },
+  logoutConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#C0392B',
+    alignItems: 'center',
+  },
+  logoutConfirmBtnText: { fontSize: 15, color: '#FFF', fontWeight: '600' },
+
+  // Confirm donation modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmModalBox: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  confirmModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  confirmModalSubtitle: {
+    fontSize: 14,
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  confirmModalEmpty: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  interestedUserItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    gap: 12,
+  },
+  interestedAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  interestedAvatarText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+  interestedUserName: { flex: 1, fontSize: 15, fontWeight: '600', color: '#000' },
+  confirmModalClose: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  confirmModalCloseText: { fontSize: 15, color: COLORS.textDark, fontWeight: '600' },
 });

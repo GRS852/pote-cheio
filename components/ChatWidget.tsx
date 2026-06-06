@@ -28,6 +28,8 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
   const [msgLoading, setMsgLoading] = useState(false);
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  const userRef = useRef<typeof user>(null);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   // Connect socket when token is available
   useEffect(() => {
@@ -36,6 +38,8 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
 
     onNewMessage(msg => {
       if (activeConvId == null) return;
+      // skip own messages — already added optimistically in handleSend
+      if (msg.author_id === userRef.current?.id) return;
       const newMsg: Message = {
         id: msg.id,
         conversation_id: activeConvId,

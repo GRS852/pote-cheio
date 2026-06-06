@@ -121,3 +121,41 @@ export async function updateDonationStatusRequest(
   const data = await response.json();
   return data.donation;
 }
+
+export async function deleteDonationRequest(token: string, donationId: number): Promise<void> {
+  const response = await fetch(`${API_URL}/donations/${donationId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Erro ao excluir doação');
+}
+
+export interface InterestedUser {
+  user_id: number;
+  full_name: string;
+  conversation_id: number;
+}
+
+export async function getInterestedUsersRequest(token: string, donationId: number): Promise<InterestedUser[]> {
+  const response = await fetch(`${API_URL}/donations/${donationId}/interested`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Erro ao carregar interessados');
+  const data = await response.json();
+  return data.interested;
+}
+
+export async function confirmDonationRequest(
+  token: string,
+  donationId: number,
+  userId: number
+): Promise<Donation> {
+  const response = await fetch(`${API_URL}/donations/${donationId}/confirm`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  if (!response.ok) throw new Error('Erro ao confirmar doação');
+  const data = await response.json();
+  return data.donation;
+}
