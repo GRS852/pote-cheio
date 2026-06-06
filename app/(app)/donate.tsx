@@ -19,7 +19,7 @@ import MainHeader from '../../components/MainHeader';
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import { Category, createDonationRequest } from '../../services/donationService';
-import { supabase } from '../../services/supabaseClient';
+
 
 const CATEGORIES: Category[] = ['Coleiras', 'Rações', 'Higiene'];
 
@@ -60,14 +60,22 @@ export default function DonateScreen() {
       if (photoUri) {
         const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
         const blob = await fetch(photoUri).then(r => r.blob());
-        const { error: uploadError } = await supabase.storage
-          .from('imagens-potecheio')
-          .upload(fileName, blob);
-        if (uploadError) throw new Error(uploadError.message);
-        const { data } = supabase.storage
-          .from('imagens-potecheio')
-          .getPublicUrl(fileName);
-        finalPhotoUrl = data.publicUrl;
+        const uploadResponse = await fetch(
+          `https://oguvupgbutzkudpeurgr.supabase.co/storage/v1/object/imagens-potecheio/${fileName}`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+              'Content-Type': blob.type || 'image/jpeg',
+            },
+            body: blob,
+          }
+        );
+        if (!uploadResponse.ok) {
+          const err = await uploadResponse.json();
+          throw new Error(err.message);
+        }
+        finalPhotoUrl = `https://oguvupgbutzkudpeurgr.supabase.co/storage/v1/object/public/imagens-potecheio/${fileName}`;
       }
 
       await createDonationRequest(token, {
