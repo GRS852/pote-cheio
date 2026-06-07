@@ -165,10 +165,53 @@ export async function resetPasswordRequest(
   }
 }
 
+const SUPABASE_URL =
+  typeof process !== 'undefined'
+    ? (process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://oguvupgbutzkudpeurgr.supabase.co')
+    : 'https://oguvupgbutzkudpeurgr.supabase.co';
+
+const SUPABASE_ANON_KEY =
+  typeof process !== 'undefined'
+    ? (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '')
+    : '';
+
 export async function getUserByIdRequest(
   token: string,
   userId: number
 ): Promise<Pick<Usuario, 'id' | 'full_name' | 'avatar_url'> | null> {
+  // 1. Try Supabase REST API directly — avatars are stored there
+  if (SUPABASE_ANON_KEY) {
+    for (const table of ['users', 'profiles']) {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/${table}?select=id,full_name,name,avatar_url,photo_url&id=eq.${userId}&limit=1`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+          }
+        );
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows) && rows.length > 0) {
+            const u = rows[0];
+            if (u.avatar_url || u.photo_url || u.full_name || u.name) {
+              return {
+                id: u.id ?? userId,
+                full_name: u.full_name ?? u.name ?? '',
+                avatar_url: u.avatar_url ?? u.photo_url ?? null,
+              };
+            }
+          }
+        }
+      } catch {
+        // continue to next table
+      }
+    }
+  }
+
+  // 2. Fallback: try known REST endpoints on the custom API
   const endpoints = [
     `/users/${userId}`,
     `/auth/users/${userId}`,
@@ -184,7 +227,8 @@ export async function getUserByIdRequest(
       if (!response.ok) continue;
       const data = await response.json();
       const u = data.user ?? data.profile ?? data;
-      if (!u || (!u.full_name && !u.name)) continue;
+      if (!u || typeof u !== 'object') continue;
+      if (!u.full_name && !u.name && !u.avatar_url) continue;
       return {
         id: u.id ?? userId,
         full_name: u.full_name ?? u.name ?? '',
@@ -194,6 +238,7 @@ export async function getUserByIdRequest(
       continue;
     }
   }
+
   return null;
 }
 
