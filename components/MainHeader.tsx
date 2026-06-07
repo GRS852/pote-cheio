@@ -15,6 +15,7 @@ import {
 import { Image } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { useAuth } from '../services/AuthContext';
+
 import {
   AppNotification,
   getNotificationsRequest,
@@ -47,12 +48,13 @@ export default function MainHeader() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const { user, token } = useAuth();
+  const { user, token, signOut } = useAuth();
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const userInitial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : '?';
 
@@ -159,7 +161,7 @@ export default function MainHeader() {
             <TouchableOpacity onPress={() => router.push('/home')}>
               <Text style={styles.linkVerde}>Doações</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/donate')}>
+            <TouchableOpacity onPress={() => router.push('/(app)/donate')}>
               <Text style={styles.linkVerde}>Quero doar</Text>
             </TouchableOpacity>
           </>
@@ -176,12 +178,71 @@ export default function MainHeader() {
 
         <TouchableOpacity
           style={styles.avatarContainer}
-          onPress={() => router.push('/profile')}
+          onPress={() => setShowUserMenu(true)}
           activeOpacity={0.8}
         >
           <Text style={styles.avatarText}>{userInitial}</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Side menu do usuário */}
+      <Modal
+        visible={showUserMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUserMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.userMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowUserMenu(false)}
+        >
+          <TouchableOpacity style={styles.userMenuPanel} activeOpacity={1} onPress={() => {}}>
+            <View style={styles.userMenuTop}>
+              <View style={styles.userMenuAvatarCircle}>
+                <Text style={styles.userMenuAvatarLetter}>{userInitial}</Text>
+              </View>
+              <Text style={styles.userMenuName} numberOfLines={1}>{user?.full_name ?? 'Usuário'}</Text>
+            </View>
+
+            <View style={styles.userMenuDivider} />
+
+            <TouchableOpacity
+              style={styles.userMenuItem}
+              onPress={() => { setShowUserMenu(false); router.push('/(app)/donate'); }}
+            >
+              <FontAwesome name="gift" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
+              <Text style={styles.userMenuItemText}>Doar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.userMenuItem}
+              onPress={() => { setShowUserMenu(false); router.push('/(app)/profile'); }}
+            >
+              <FontAwesome name="heart" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
+              <Text style={styles.userMenuItemText}>Minhas Doações</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.userMenuItem}
+              onPress={() => { setShowUserMenu(false); router.push('/(app)/messages'); }}
+            >
+              <FontAwesome name="comment" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
+              <Text style={styles.userMenuItemText}>Minhas Mensagens</Text>
+            </TouchableOpacity>
+
+            <View style={styles.userMenuDivider} />
+
+            <TouchableOpacity
+              style={styles.userMenuItem}
+              onPress={async () => { setShowUserMenu(false); await signOut(); }}
+            >
+              <FontAwesome name="sign-out" size={18} color="#C0392B" style={styles.userMenuIcon} />
+              <Text style={[styles.userMenuItemText, { color: '#C0392B' }]}>Sair</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -307,4 +368,48 @@ const styles = StyleSheet.create({
   },
   notifEmpty: { padding: 40, alignItems: 'center', gap: 12 },
   notifEmptyText: { fontSize: 14, color: COLORS.textLight },
+
+  // User side menu
+  userMenuOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  userMenuPanel: {
+    width: 270,
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: -4, height: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 24,
+  },
+  userMenuTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 32,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  userMenuAvatarCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: COLORS.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userMenuAvatarLetter: { color: '#FFF', fontWeight: 'bold', fontSize: 20 },
+  userMenuName: { flex: 1, fontSize: 16, fontWeight: '600', color: '#000' },
+  userMenuDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: 6 },
+  userMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  userMenuIcon: { width: 26, marginRight: 12 },
+  userMenuItemText: { fontSize: 15, color: '#000' },
 });

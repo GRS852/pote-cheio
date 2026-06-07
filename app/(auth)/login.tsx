@@ -86,9 +86,15 @@ export default function LoginScreen() {
             <View style={styles.socialRow}>
               <View style={styles.socialButtonWrapper}>
                 <Button title="Facebook" variant="outline" icon={<FontAwesome name="facebook" size={24} color="#1877F2" />} onPress={() => {}} />
+                <View style={styles.comingSoonOverlay} pointerEvents="none">
+                  <Text style={styles.comingSoonText}>Em Breve</Text>
+                </View>
               </View>
               <View style={styles.socialButtonWrapper}>
                 <Button title="Google" variant="outline" icon={<FontAwesome name="google" size={24} color="#DB4437" />} onPress={() => {}} />
+                <View style={styles.comingSoonOverlay} pointerEvents="none">
+                  <Text style={styles.comingSoonText}>Em Breve</Text>
+                </View>
               </View>
             </View>
 
@@ -132,7 +138,15 @@ const styles = StyleSheet.create({
   divider: { flex: 1, height: 1, backgroundColor: COLORS.border },
   dividerText: { marginHorizontal: 10, color: COLORS.textLight },
   socialRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  socialButtonWrapper: { flex: 1 },
+  socialButtonWrapper: { flex: 1, position: 'relative' },
+  comingSoonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  comingSoonText: { fontSize: 13, fontWeight: '700', color: COLORS.textDark, letterSpacing: 0.5 },
   registerText: { textAlign: 'center', marginTop: 24, fontSize: 16 },
   registerLink: { color: COLORS.secondary, fontWeight: 'bold' },
   termsText: { textAlign: 'center', marginTop: 16, fontSize: 12, color: COLORS.textDark },
