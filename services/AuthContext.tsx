@@ -35,6 +35,8 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string, birthDate: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  updateUserLocally: (partial: Partial<Usuario>) => void;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -106,8 +108,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(false);
   }
 
+  async function refreshUser() {
+    if (!token) return;
+    try {
+      const updated = await getMeRequest(token);
+      setUser(updated);
+    } catch {}
+  }
+
+  function updateUserLocally(partial: Partial<Usuario>) {
+    setUser(prev => prev ? { ...prev, ...partial } : prev);
+  }
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, token, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, token, signIn, signUp, signOut, refreshUser, updateUserLocally }}>
       {children}
     </AuthContext.Provider>
   );

@@ -8,6 +8,7 @@ export type Usuario = {
   created_at: string;
   phone: string | null;
   cpf: string | null;
+  avatar_url?: string | null;
 };
 
 export class NetworkError extends Error {
@@ -88,6 +89,80 @@ export async function signUpRequest(
   if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
 
   return response.json();
+}
+
+export async function updateProfileRequest(
+  token: string,
+  payload: { avatar_url?: string | null; full_name?: string }
+): Promise<Usuario> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new NetworkError();
+  }
+  if (!response.ok) throw new NetworkError(`Erro ao atualizar perfil (${response.status})`);
+  const data = await response.json();
+  return data.user as Usuario;
+}
+
+export async function forgotPasswordRequest(email: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    throw new NetworkError();
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.message ?? `Erro ao enviar código (${response.status})`);
+  }
+}
+
+export async function verifyResetCodeRequest(email: string, code: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/verify-reset-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+  } catch {
+    throw new NetworkError();
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.message ?? 'Código inválido ou expirado.');
+  }
+}
+
+export async function resetPasswordRequest(
+  email: string,
+  code: string,
+  new_password: string
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code, new_password }),
+    });
+  } catch {
+    throw new NetworkError();
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.message ?? 'Não foi possível redefinir a senha.');
+  }
 }
 
 export async function getMeRequest(token: string): Promise<Usuario> {

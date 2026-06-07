@@ -40,3 +40,11 @@ export async function getMessagesRequest(token: string, conversationId: number):
   const data = await response.json();
   return data.messages;
 }
+
+export async function hideConversationRequest(token: string, conversationId: number): Promise<void> {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/hide`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Erro ao remover conversa');
+}

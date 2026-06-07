@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { useAuth } from '../services/AuthContext';
-import { Conversation, Message, getConversationsRequest, getMessagesRequest } from '../services/conversationService';
+import { Conversation, Message, getConversationsRequest, getMessagesRequest, hideConversationRequest } from '../services/conversationService';
 import { connectSocket, joinRoom, offNewMessage, onNewMessage, sendSocketMessage } from '../services/socketService';
 
 interface ChatWidgetProps {
@@ -87,6 +87,15 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
       setMsgLoading(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
     }
+  }
+
+  async function handleHideConversation(convId: number) {
+    if (!token) return;
+    try {
+      await hideConversationRequest(token, convId);
+      setConversations(prev => prev.filter(c => c.id !== convId));
+      if (activeConvId === convId) setActiveConvId(null);
+    } catch {}
   }
 
   function handleClose() {
@@ -208,17 +217,22 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
                 conversations.map(conv => {
                   const name = conv.other_user?.full_name ?? 'Usuário';
                   return (
-                    <TouchableOpacity key={conv.id} style={styles.chatItem} onPress={() => openConversation(conv.id)}>
-                      <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
-                      </View>
-                      <View style={styles.chatInfo}>
-                        <Text style={styles.chatUserName}>{name}</Text>
-                        {conv.donation && (
-                          <Text style={styles.chatMessage} numberOfLines={1}>{conv.donation.title}</Text>
-                        )}
-                      </View>
-                    </TouchableOpacity>
+                    <View key={conv.id} style={styles.chatItem}>
+                      <TouchableOpacity style={styles.chatItemMain} onPress={() => openConversation(conv.id)} activeOpacity={0.7}>
+                        <View style={styles.avatar}>
+                          <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <View style={styles.chatInfo}>
+                          <Text style={styles.chatUserName}>{name}</Text>
+                          {conv.donation && (
+                            <Text style={styles.chatMessage} numberOfLines={1}>{conv.donation.title}</Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.chatDeleteBtn} onPress={() => handleHideConversation(conv.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="trash-outline" size={16} color={COLORS.textLight} />
+                      </TouchableOpacity>
+                    </View>
                   );
                 })
               )}
@@ -258,7 +272,9 @@ const styles = StyleSheet.create({
   input: { flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: COLORS.border, borderRadius: 20, paddingHorizontal: 14, height: 40, marginRight: 8, color: '#000', outlineStyle: 'none' as any },
   sendButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
   chatList: { flex: 1, backgroundColor: '#FFF' },
-  chatItem: { flexDirection: 'row', padding: 14, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  chatItem: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  chatItemMain: { flexDirection: 'row', flex: 1, padding: 14, alignItems: 'center' },
+  chatDeleteBtn: { padding: 14 },
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#EAEAEA', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   avatarText: { fontSize: 18, fontWeight: 'bold', color: COLORS.primary },
   chatInfo: { flex: 1, justifyContent: 'center' },
