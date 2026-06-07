@@ -174,8 +174,8 @@ export default function MessagesScreen() {
   const currentMessages = activeConvId != null ? (messages[activeConvId] ?? []) : [];
 
   const filteredConversations = conversations.filter(conv => {
-    if (activeTab === 'Doando' && conv.donor_id !== user?.id) return false;
-    if (activeTab === 'Recebendo' && conv.recipient_id !== user?.id) return false;
+    if (activeTab === 'Doando' && conv.recipient_id !== user?.id) return false;
+    if (activeTab === 'Recebendo' && conv.sender_id !== user?.id) return false;
     if (searchText) {
       const q = searchText.toLowerCase();
       const other = user ? getOtherUser(conv, user.id) : undefined;

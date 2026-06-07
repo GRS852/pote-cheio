@@ -11,42 +11,46 @@ export interface ConversationUser {
 export interface Conversation {
   id: number;
   donation_id: number;
-  donor_id: number;
+  // Campos reais retornados pela API
+  sender_id: number;
   recipient_id: number;
+  sender_name?: string;
+  recipient_name?: string;
   created_at: string;
   donation?: { id: number; title: string };
-  // possíveis nomes de campo retornados pela API
+  // Campo enriquecido pelo frontend após fetch
   other_user?: ConversationUser;
-  donor_user?: ConversationUser;
-  recipient_user?: ConversationUser;
-  donor?: ConversationUser;
-  recipient?: ConversationUser;
-  participants?: ConversationUser[];
 }
 
 /**
- * Resolve o outro participante independente de qual nome de campo a API usa.
- * Testa: other_user, donor_user/recipient_user, donor/recipient, participants[].
+ * Retorna o outro participante da conversa.
+ * Usa os campos planos sender_name/recipient_name que a API realmente devolve.
+ * Se já houver other_user enriquecido (com avatar), usa ele.
  */
 export function getOtherUser(
   conv: Conversation,
   currentUserId: number
 ): ConversationUser | undefined {
-  // campo direto
-  if (conv.other_user?.full_name) return conv.other_user;
+  const isSender = currentUserId === conv.sender_id;
 
-  // array de participantes (alguns backends retornam assim)
-  if (Array.isArray(conv.participants)) {
-    const other = conv.participants.find(p => p.id !== currentUserId);
-    if (other?.full_name) return other;
+  // Usar campos planos da API real
+  if (isSender && conv.recipient_name) {
+    return {
+      id: conv.recipient_id,
+      full_name: conv.recipient_name,
+      avatar_url: conv.other_user?.avatar_url ?? null,
+    };
+  }
+  if (!isSender && conv.sender_name) {
+    return {
+      id: conv.sender_id,
+      full_name: conv.sender_name,
+      avatar_url: conv.other_user?.avatar_url ?? null,
+    };
   }
 
-  // campos separados por papel
-  const isDonor = currentUserId === conv.donor_id;
-  const byRole = isDonor
-    ? (conv.recipient_user ?? conv.recipient)
-    : (conv.donor_user ?? conv.donor);
-  if (byRole?.full_name) return byRole;
+  // Fallback: objeto enriquecido (caso o backend mude no futuro)
+  if (conv.other_user?.full_name) return conv.other_user;
 
   return undefined;
 }
@@ -70,16 +74,16 @@ export async function getConversationsRequest(
   const data = await response.json();
   const convs: Conversation[] = data.conversations ?? [];
 
-  // Enriquecer conversas que não têm info do outro usuário
+  // Tentar enriquecer avatar (sender_name/recipient_name já resolvem o nome)
   if (currentUserId != null) {
     await Promise.all(
       convs.map(async conv => {
-        if (getOtherUser(conv, currentUserId)?.full_name) return;
+        // otherId = ID do outro participante
         const otherId =
-          currentUserId === conv.donor_id ? conv.recipient_id : conv.donor_id;
+          currentUserId === conv.sender_id ? conv.recipient_id : conv.sender_id;
         if (!otherId) return;
         const userInfo = await getUserByIdRequest(token, otherId);
-        if (userInfo?.full_name) {
+        if (userInfo) {
           conv.other_user = {
             id: userInfo.id,
             full_name: userInfo.full_name,
