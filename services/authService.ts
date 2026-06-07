@@ -165,6 +165,28 @@ export async function resetPasswordRequest(
   }
 }
 
+export async function getUserByIdRequest(
+  token: string,
+  userId: number
+): Promise<Pick<Usuario, 'id' | 'full_name' | 'avatar_url'> | null> {
+  try {
+    const response = await fetch(`${API_URL}/users/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const u = data.user ?? data;
+    if (!u || (!u.full_name && !u.name)) return null;
+    return {
+      id: u.id ?? userId,
+      full_name: u.full_name ?? u.name ?? '',
+      avatar_url: u.avatar_url ?? u.photo_url ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getMeRequest(token: string): Promise<Usuario> {
   let response: Response;
   try {

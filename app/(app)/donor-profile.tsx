@@ -1,53 +1,76 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import MainHeader from '../../components/MainHeader';
-import ProfileUserInfo from '../../components/ProfileUserInfo';
 import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
+import ProfileUserInfo from '../../components/ProfileUserInfo';
 import { COLORS } from '../../constants/theme';
+import { useAuth } from '../../services/AuthContext';
+import { getUserByIdRequest } from '../../services/authService';
 
-const MOCK_DONOR_PROFILE = {
-  name: "Lara santos",
-  avatarUrl: require('../../assets/images/logo.png'), 
-  memberSince: "2023",
-  location: "São Paulo",
-  stats: [
-    { count: 2, label: 'Doações recebidas' },
-    { count: 20, label: 'Doações realizadas' }
-  ],
-  impact: {
-    totalDonatedValue: "R$1.200,00",
-    itemsDonatedCount: 48,
-    animalsHelpedCount: 30,
-    tutorsHelpedCount: 22
-  }
-};
+interface DonorData {
+  name: string;
+  avatarUrl: string | null;
+  memberSince: string;
+}
 
 export default function DonorProfileScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { token } = useAuth();
+  const [donor, setDonor] = useState<DonorData | null>(null);
+  const [loading, setLoading] = useState(!!id);
+
+  useEffect(() => {
+    if (!id || !token) { setLoading(false); return; }
+    getUserByIdRequest(token, Number(id))
+      .then(u => {
+        if (u) {
+          setDonor({
+            name: u.full_name,
+            avatarUrl: u.avatar_url ?? null,
+            memberSince: new Date().getFullYear().toString(),
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [id, token]);
+
+  const displayName = donor?.name ?? 'Usuário';
+  const displayAvatar = donor?.avatarUrl ?? null;
+  const memberSince = donor?.memberSince ?? new Date().getFullYear().toString();
+
   return (
     <View style={styles.mainContainer}>
       <MainHeader />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.contentWrapper}>
-          
+
           <Text style={styles.pageTitle}>
-            Perfil <Text style={{ color: COLORS.secondary }}>doadora</Text>
+            Perfil <Text style={{ color: COLORS.secondary }}>doador</Text>
           </Text>
 
-          <ProfileUserInfo 
-            name={MOCK_DONOR_PROFILE.name}
-            avatarUrl={MOCK_DONOR_PROFILE.avatarUrl} 
-            memberSince={MOCK_DONOR_PROFILE.memberSince}
-            location={MOCK_DONOR_PROFILE.location}
-            stats={MOCK_DONOR_PROFILE.stats} 
-          />
+          {loading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <>
+              <ProfileUserInfo
+                name={displayName}
+                avatarUrl={displayAvatar as any}
+                memberSince={memberSince}
+                location=""
+                stats={[]}
+              />
 
-          <ProfileImpactMetrics 
-            totalDonatedValue={MOCK_DONOR_PROFILE.impact.totalDonatedValue}
-            itemsDonatedCount={MOCK_DONOR_PROFILE.impact.itemsDonatedCount}
-            animalsHelpedCount={MOCK_DONOR_PROFILE.impact.animalsHelpedCount}
-          />
+              <ProfileImpactMetrics
+                totalDonatedValue=""
+                itemsDonatedCount={0}
+                animalsHelpedCount={0}
+              />
+            </>
+          )}
 
         </View>
       </ScrollView>

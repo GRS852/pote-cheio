@@ -1,3 +1,5 @@
+import { getUserByIdRequest } from './authService';
+
 const API_URL = 'https://api.potecheio.site';
 
 export interface ConversationUser {
@@ -13,29 +15,40 @@ export interface Conversation {
   recipient_id: number;
   created_at: string;
   donation?: { id: number; title: string };
-  // primary field
+  // possíveis nomes de campo retornados pela API
   other_user?: ConversationUser;
-  // alternate names the backend may use
   donor_user?: ConversationUser;
   recipient_user?: ConversationUser;
   donor?: ConversationUser;
   recipient?: ConversationUser;
+  participants?: ConversationUser[];
 }
 
 /**
- * Resolves the other participant in a conversation regardless of which field
- * name the API uses (other_user, donor_user, recipient_user, donor, recipient).
+ * Resolve o outro participante independente de qual nome de campo a API usa.
+ * Testa: other_user, donor_user/recipient_user, donor/recipient, participants[].
  */
 export function getOtherUser(
   conv: Conversation,
   currentUserId: number
 ): ConversationUser | undefined {
+  // campo direto
   if (conv.other_user?.full_name) return conv.other_user;
-  const isDonor = currentUserId === conv.donor_id;
-  if (isDonor) {
-    return conv.recipient_user ?? conv.recipient ?? undefined;
+
+  // array de participantes (alguns backends retornam assim)
+  if (Array.isArray(conv.participants)) {
+    const other = conv.participants.find(p => p.id !== currentUserId);
+    if (other?.full_name) return other;
   }
-  return conv.donor_user ?? conv.donor ?? undefined;
+
+  // campos separados por papel
+  const isDonor = currentUserId === conv.donor_id;
+  const byRole = isDonor
+    ? (conv.recipient_user ?? conv.recipient)
+    : (conv.donor_user ?? conv.donor);
+  if (byRole?.full_name) return byRole;
+
+  return undefined;
 }
 
 export interface Message {
@@ -46,13 +59,38 @@ export interface Message {
   sent_at: string;
 }
 
-export async function getConversationsRequest(token: string): Promise<Conversation[]> {
+export async function getConversationsRequest(
+  token: string,
+  currentUserId?: number
+): Promise<Conversation[]> {
   const response = await fetch(`${API_URL}/conversations`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error('Erro ao carregar conversas');
   const data = await response.json();
-  return data.conversations;
+  const convs: Conversation[] = data.conversations ?? [];
+
+  // Enriquecer conversas que não têm info do outro usuário
+  if (currentUserId != null) {
+    await Promise.all(
+      convs.map(async conv => {
+        if (getOtherUser(conv, currentUserId)?.full_name) return;
+        const otherId =
+          currentUserId === conv.donor_id ? conv.recipient_id : conv.donor_id;
+        if (!otherId) return;
+        const userInfo = await getUserByIdRequest(token, otherId);
+        if (userInfo?.full_name) {
+          conv.other_user = {
+            id: userInfo.id,
+            full_name: userInfo.full_name,
+            avatar_url: userInfo.avatar_url ?? null,
+          };
+        }
+      })
+    );
+  }
+
+  return convs;
 }
 
 export async function getMessagesRequest(token: string, conversationId: number): Promise<Message[]> {

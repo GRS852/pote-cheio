@@ -188,7 +188,11 @@ export default function MainHeader({ searchValue, onSearchChange }: MainHeaderPr
           onPress={() => setShowUserMenu(true)}
           activeOpacity={0.8}
         >
-          <Text style={styles.avatarText}>{userInitial}</Text>
+          {user?.avatar_url ? (
+            <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} resizeMode="cover" />
+          ) : (
+            <Text style={styles.avatarText}>{userInitial}</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -207,7 +211,11 @@ export default function MainHeader({ searchValue, onSearchChange }: MainHeaderPr
           <TouchableOpacity style={styles.userMenuPanel} activeOpacity={1} onPress={() => {}}>
             <View style={styles.userMenuTop}>
               <View style={styles.userMenuAvatarCircle}>
-                <Text style={styles.userMenuAvatarLetter}>{userInitial}</Text>
+                {user?.avatar_url ? (
+                  <Image source={{ uri: user.avatar_url }} style={styles.userMenuAvatarImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.userMenuAvatarLetter}>{userInitial}</Text>
+                )}
               </View>
               <Text style={styles.userMenuName} numberOfLines={1}>{user?.full_name ?? 'Usuário'}</Text>
             </View>
@@ -306,6 +314,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+  avatarImage: { width: 35, height: 35, borderRadius: 17.5 },
 
   // Modal overlay
   modalOverlay: {
@@ -409,6 +418,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   userMenuAvatarLetter: { color: '#FFF', fontWeight: 'bold', fontSize: 20 },
+  userMenuAvatarImage: { width: 46, height: 46, borderRadius: 23 },
   userMenuName: { flex: 1, fontSize: 16, fontWeight: '600', color: '#000' },
   userMenuDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: 6 },
   userMenuItem: {

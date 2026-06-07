@@ -121,7 +121,7 @@ export default function MessagesScreen() {
   useEffect(() => {
     if (!token) return;
     setConvLoading(true);
-    getConversationsRequest(token)
+    getConversationsRequest(token, user?.id)
       .then(setConversations)
       .catch(() => setConversations([]))
       .finally(() => setConvLoading(false));
@@ -301,7 +301,18 @@ export default function MessagesScreen() {
             </View>
             <View>
               <Text style={styles.chatAreaUserName}>{otherName}</Text>
-              <Text style={styles.chatAreaUserSub}>Ver perfil</Text>
+              {activeOtherUser && (
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/donor-profile',
+                      params: { id: String(activeOtherUser.id) },
+                    })
+                  }
+                >
+                  <Text style={styles.chatAreaUserSub}>Ver perfil</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 

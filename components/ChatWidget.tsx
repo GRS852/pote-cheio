@@ -71,11 +71,11 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
   useEffect(() => {
     if (!isOpen || !token) return;
     setConvLoading(true);
-    getConversationsRequest(token)
+    getConversationsRequest(token, user?.id)
       .then(setConversations)
       .catch(() => setConversations([]))
       .finally(() => setConvLoading(false));
-  }, [isOpen, token]);
+  }, [isOpen, token, user?.id]);
 
   // Bug fix: also depends on isOpen so that reopening the widget with the same
   // forceOpenConversationId (same conversation_id returned by the backend) still
