@@ -44,7 +44,12 @@ function notifIconInfo(type: string): { name: string; color: string; bg: string 
   }
 }
 
-export default function MainHeader() {
+interface MainHeaderProps {
+  searchValue?: string;
+  onSearchChange?: (text: string) => void;
+}
+
+export default function MainHeader({ searchValue, onSearchChange }: MainHeaderProps = {}) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -151,6 +156,8 @@ export default function MainHeader() {
           style={styles.searchInput}
           placeholder="Procure itens"
           placeholderTextColor={COLORS.textDark}
+          value={searchValue}
+          onChangeText={onSearchChange}
         />
         <FontAwesome name="search" size={16} color={COLORS.textDark} style={styles.searchIcon} />
       </View>

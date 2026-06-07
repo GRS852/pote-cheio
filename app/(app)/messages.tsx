@@ -20,6 +20,7 @@ import {
   Message,
   getConversationsRequest,
   getMessagesRequest,
+  getOtherUser,
   hideConversationRequest,
 } from '../../services/conversationService';
 import {
@@ -177,7 +178,8 @@ export default function MessagesScreen() {
     if (activeTab === 'Recebendo' && conv.recipient_id !== user?.id) return false;
     if (searchText) {
       const q = searchText.toLowerCase();
-      const name = (conv.other_user?.full_name ?? '').toLowerCase();
+      const other = user ? getOtherUser(conv, user.id) : undefined;
+      const name = (other?.full_name ?? '').toLowerCase();
       const title = (conv.donation?.title ?? '').toLowerCase();
       if (!name.includes(q) && !title.includes(q)) return false;
     }
@@ -227,7 +229,8 @@ export default function MessagesScreen() {
           </View>
         ) : (
           filteredConversations.map(conv => {
-            const name = conv.other_user?.full_name ?? 'Usuário';
+            const otherUser = user ? getOtherUser(conv, user.id) : undefined;
+            const name = otherUser?.full_name ?? 'Usuário';
             const isActive = conv.id === activeConvId;
             return (
               <TouchableOpacity
@@ -237,7 +240,7 @@ export default function MessagesScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.convAvatar}>
-                  <ContactAvatar name={name} avatarUrl={conv.other_user?.avatar_url} size={42} />
+                  <ContactAvatar name={name} avatarUrl={otherUser?.avatar_url} size={42} />
                 </View>
                 <View style={styles.convInfo}>
                   <Text style={styles.convName} numberOfLines={1}>{name}</Text>
@@ -276,7 +279,8 @@ export default function MessagesScreen() {
       );
     }
 
-    const otherName = activeConv?.other_user?.full_name ?? 'Usuário';
+    const activeOtherUser = activeConv && user ? getOtherUser(activeConv, user.id) : undefined;
+    const otherName = activeOtherUser?.full_name ?? 'Usuário';
 
     return (
       <View style={styles.chatArea}>
@@ -291,7 +295,7 @@ export default function MessagesScreen() {
             <View style={styles.chatAreaAvatar}>
               <ContactAvatar
                 name={otherName}
-                avatarUrl={activeConv?.other_user?.avatar_url}
+                avatarUrl={activeOtherUser?.avatar_url}
                 size={42}
               />
             </View>

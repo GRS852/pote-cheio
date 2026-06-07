@@ -13,7 +13,29 @@ export interface Conversation {
   recipient_id: number;
   created_at: string;
   donation?: { id: number; title: string };
+  // primary field
   other_user?: ConversationUser;
+  // alternate names the backend may use
+  donor_user?: ConversationUser;
+  recipient_user?: ConversationUser;
+  donor?: ConversationUser;
+  recipient?: ConversationUser;
+}
+
+/**
+ * Resolves the other participant in a conversation regardless of which field
+ * name the API uses (other_user, donor_user, recipient_user, donor, recipient).
+ */
+export function getOtherUser(
+  conv: Conversation,
+  currentUserId: number
+): ConversationUser | undefined {
+  if (conv.other_user?.full_name) return conv.other_user;
+  const isDonor = currentUserId === conv.donor_id;
+  if (isDonor) {
+    return conv.recipient_user ?? conv.recipient ?? undefined;
+  }
+  return conv.donor_user ?? conv.donor ?? undefined;
 }
 
 export interface Message {

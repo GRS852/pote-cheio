@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { useAuth } from '../services/AuthContext';
-import { Conversation, Message, getConversationsRequest, getMessagesRequest, hideConversationRequest } from '../services/conversationService';
+import { Conversation, Message, getConversationsRequest, getMessagesRequest, getOtherUser, hideConversationRequest } from '../services/conversationService';
 import { connectSocket, joinRoom, offNewMessage, onNewMessage, sendSocketMessage } from '../services/socketService';
 
 interface ChatWidgetProps {
@@ -140,7 +140,8 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
 
   const renderHeader = () => {
     if (activeConvId != null) {
-      const name = activeConv?.other_user?.full_name ?? 'Usuário';
+      const otherUser = activeConv && user ? getOtherUser(activeConv, user.id) : undefined;
+      const name = otherUser?.full_name ?? 'Usuário';
       return (
         <View style={styles.headerLeft}>
           {!forceOpenConversationId && (
@@ -149,7 +150,7 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
             </TouchableOpacity>
           )}
           <View style={[styles.avatarMini, { overflow: 'hidden' }]}>
-            <ContactAvatar name={name} avatarUrl={activeConv?.other_user?.avatar_url} size={35} bg="#FFF" />
+            <ContactAvatar name={name} avatarUrl={otherUser?.avatar_url} size={35} bg="#FFF" />
           </View>
           <View>
             <Text style={styles.chatTitleSpecific}>{name}</Text>
@@ -223,12 +224,13 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
                 </View>
               ) : (
                 conversations.map(conv => {
-                  const name = conv.other_user?.full_name ?? 'Usuário';
+                  const otherUser = user ? getOtherUser(conv, user.id) : undefined;
+                  const name = otherUser?.full_name ?? 'Usuário';
                   return (
                     <View key={conv.id} style={styles.chatItem}>
                       <TouchableOpacity style={styles.chatItemMain} onPress={() => openConversation(conv.id)} activeOpacity={0.7}>
                         <View style={[styles.avatar, { overflow: 'hidden' }]}>
-                          <ContactAvatar name={name} avatarUrl={conv.other_user?.avatar_url} size={42} />
+                          <ContactAvatar name={name} avatarUrl={otherUser?.avatar_url} size={42} />
                         </View>
                         <View style={styles.chatInfo}>
                           <Text style={styles.chatUserName}>{name}</Text>

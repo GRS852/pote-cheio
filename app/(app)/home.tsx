@@ -31,8 +31,15 @@ export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('Todos');
   const [donations, setDonations] = useState<FeedDonation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const firstName = user?.full_name ? user.full_name.split(' ')[0] : 'Visitante';
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const loadFeed = useCallback(async () => {
     if (!token) return;
@@ -40,6 +47,7 @@ export default function HomeScreen() {
     try {
       const res = await getFeedRequest(token, {
         category: activeFilter !== 'Todos' ? activeFilter : undefined,
+        search: debouncedSearch || undefined,
         limit: 20,
       });
       setDonations(res.donations);
@@ -48,7 +56,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [token, activeFilter]);
+  }, [token, activeFilter, debouncedSearch]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
@@ -66,7 +74,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.mainContainer}>
-      <MainHeader />
+      <MainHeader searchValue={searchQuery} onSearchChange={setSearchQuery} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
 
