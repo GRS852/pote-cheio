@@ -187,6 +187,7 @@ export default function ProductScreen() {
         forceOpenConversationId={conversationId}
         forceOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
+        fallbackUserName={donation.donor?.full_name}
       />
     </View>
   );

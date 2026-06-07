@@ -10,6 +10,8 @@ interface ChatWidgetProps {
   forceOpenConversationId?: number | null;
   forceOpen?: boolean;
   onClose?: () => void;
+  fallbackUserName?: string;
+  fallbackUserAvatar?: string | null;
 }
 
 function ContactAvatar({ name, avatarUrl, size, bg }: { name: string; avatarUrl?: string | null; size: number; bg?: string }) {
@@ -24,7 +26,7 @@ function ContactAvatar({ name, avatarUrl, size, bg }: { name: string; avatarUrl?
   );
 }
 
-export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose }: ChatWidgetProps) {
+export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose, fallbackUserName, fallbackUserAvatar }: ChatWidgetProps) {
   const { token, user } = useAuth();
   const [localIsOpen, setLocalIsOpen] = useState(false);
   const isOpen = forceOpen || localIsOpen;
@@ -75,16 +77,19 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
       .finally(() => setConvLoading(false));
   }, [isOpen, token]);
 
-  // Honor forceOpenConversationId from product screen
+  // Bug fix: also depends on isOpen so that reopening the widget with the same
+  // forceOpenConversationId (same conversation_id returned by the backend) still
+  // re-triggers the open. force=true bypasses the message cache so fresh messages
+  // are always fetched when the chat is opened from a product page.
   useEffect(() => {
-    if (forceOpenConversationId != null) {
-      openConversation(forceOpenConversationId);
+    if (forceOpenConversationId != null && isOpen) {
+      openConversation(forceOpenConversationId, true);
     }
-  }, [forceOpenConversationId]);
+  }, [isOpen, forceOpenConversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function openConversation(convId: number) {
+  async function openConversation(convId: number, force = false) {
     setActiveConvId(convId);
-    if (messages[convId]) return; // already loaded
+    if (!force && messages[convId]) return; // use cache only when not forced
     if (!token) return;
     setMsgLoading(true);
     try {
@@ -141,7 +146,9 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
   const renderHeader = () => {
     if (activeConvId != null) {
       const otherUser = activeConv && user ? getOtherUser(activeConv, user.id) : undefined;
-      const name = otherUser?.full_name ?? 'Usuário';
+      // fallback to props passed from product page while conversations are still loading
+      const name = otherUser?.full_name ?? fallbackUserName ?? 'Usuário';
+      const avatar = otherUser?.avatar_url ?? fallbackUserAvatar;
       return (
         <View style={styles.headerLeft}>
           {!forceOpenConversationId && (
@@ -150,7 +157,7 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
             </TouchableOpacity>
           )}
           <View style={[styles.avatarMini, { overflow: 'hidden' }]}>
-            <ContactAvatar name={name} avatarUrl={otherUser?.avatar_url} size={35} bg="#FFF" />
+            <ContactAvatar name={name} avatarUrl={avatar} size={35} bg="#FFF" />
           </View>
           <View>
             <Text style={styles.chatTitleSpecific}>{name}</Text>
