@@ -3,6 +3,7 @@ const API_URL = 'https://api.potecheio.site';
 export interface ConversationUser {
   id: number;
   full_name: string;
+  avatar_url?: string | null;
 }
 
 export interface Conversation {

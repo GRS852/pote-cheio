@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { useAuth } from '../services/AuthContext';
 import { Conversation, Message, getConversationsRequest, getMessagesRequest, hideConversationRequest } from '../services/conversationService';
@@ -12,8 +12,16 @@ interface ChatWidgetProps {
   onClose?: () => void;
 }
 
-function nowTime() {
-  return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+function ContactAvatar({ name, avatarUrl, size, bg }: { name: string; avatarUrl?: string | null; size: number; bg?: string }) {
+  const radius = size / 2;
+  if (avatarUrl) {
+    return <Image source={{ uri: avatarUrl }} style={{ width: size, height: size, borderRadius: radius }} resizeMode="cover" />;
+  }
+  return (
+    <View style={{ width: size, height: size, borderRadius: radius, backgroundColor: bg ?? '#EAEAEA', justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ color: bg ? COLORS.primary : '#888', fontWeight: 'bold', fontSize: size * 0.42 }}>{name.charAt(0).toUpperCase()}</Text>
+    </View>
+  );
 }
 
 export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose }: ChatWidgetProps) {
@@ -140,8 +148,8 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
               <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
           )}
-          <View style={styles.avatarMini}>
-            <Text style={styles.avatarMiniText}>{name.charAt(0).toUpperCase()}</Text>
+          <View style={[styles.avatarMini, { overflow: 'hidden' }]}>
+            <ContactAvatar name={name} avatarUrl={activeConv?.other_user?.avatar_url} size={35} bg="#FFF" />
           </View>
           <View>
             <Text style={styles.chatTitleSpecific}>{name}</Text>
@@ -219,8 +227,8 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
                   return (
                     <View key={conv.id} style={styles.chatItem}>
                       <TouchableOpacity style={styles.chatItemMain} onPress={() => openConversation(conv.id)} activeOpacity={0.7}>
-                        <View style={styles.avatar}>
-                          <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+                        <View style={[styles.avatar, { overflow: 'hidden' }]}>
+                          <ContactAvatar name={name} avatarUrl={conv.other_user?.avatar_url} size={42} />
                         </View>
                         <View style={styles.chatInfo}>
                           <Text style={styles.chatUserName}>{name}</Text>

@@ -60,17 +60,20 @@ export default function ProfileScreen() {
   const memberSince = user?.created_at ? new Date(user.created_at).getFullYear().toString() : '';
   const completedCount = myDonations.filter(d => d.status === 'completed').length;
 
+  // Load on mount — used in impact metrics, Minhas doações and História
   useEffect(() => {
-    if (activeTab !== 'Minhas doações' || !token) return;
+    if (!token) return;
     setDonationsLoading(true);
     getMyDonationsRequest(token)
       .then(setMyDonations)
       .catch(() => setMyDonations([]))
       .finally(() => setDonationsLoading(false));
-  }, [activeTab, token]);
+  }, [token]);
 
+  // Load wishlist for Favoritos and História tabs
   useEffect(() => {
-    if (activeTab !== 'Favoritos' || !token) return;
+    if ((activeTab !== 'Favoritos' && activeTab !== 'Historia') || !token) return;
+    if (wishlist.length > 0) return;
     setWishlistLoading(true);
     getWishlistRequest(token)
       .then(setWishlist)
@@ -315,9 +318,71 @@ export default function ProfileScreen() {
             )}
 
             {activeTab === 'Historia' && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>Nenhuma história registrada ainda.</Text>
-              </View>
+              (donationsLoading || wishlistLoading) ? (
+                <ActivityIndicator color={COLORS.primary} style={{ padding: 30 }} />
+              ) : (
+                <View>
+                  {/* Doações feitas */}
+                  <Text style={styles.historySection}>Doações feitas</Text>
+                  {myDonations.filter(d => d.status === 'completed').length === 0 ? (
+                    <View style={styles.historyEmpty}>
+                      <Text style={styles.emptyStateText}>Nenhuma doação concluída ainda.</Text>
+                    </View>
+                  ) : (
+                    myDonations.filter(d => d.status === 'completed').map(d => (
+                      <View key={d.id} style={styles.historyItem}>
+                        {d.photo_url ? (
+                          <Image source={{ uri: d.photo_url }} style={styles.historyImage} />
+                        ) : (
+                          <View style={[styles.historyImage, styles.historyImagePlaceholder]}>
+                            <FontAwesome name="gift" size={18} color={COLORS.primary} />
+                          </View>
+                        )}
+                        <View style={styles.historyInfo}>
+                          <Text style={styles.historyItemTitle} numberOfLines={1}>{d.title}</Text>
+                          <Text style={styles.historyItemCategory}>{d.category}</Text>
+                          <Text style={styles.historyItemDate}>
+                            {new Date(d.created_at).toLocaleDateString('pt-BR')}
+                          </Text>
+                        </View>
+                        <View style={styles.historyBadgeDone}>
+                          <Text style={styles.historyBadgeDoneText}>Doado</Text>
+                        </View>
+                      </View>
+                    ))
+                  )}
+
+                  {/* Doações recebidas */}
+                  <Text style={[styles.historySection, { marginTop: 24 }]}>Doações recebidas</Text>
+                  {wishlist.filter(d => d.status === 'completed').length === 0 ? (
+                    <View style={styles.historyEmpty}>
+                      <Text style={styles.emptyStateText}>Nenhuma doação recebida ainda.</Text>
+                    </View>
+                  ) : (
+                    wishlist.filter(d => d.status === 'completed').map(d => (
+                      <View key={d.id} style={styles.historyItem}>
+                        {d.photo_url ? (
+                          <Image source={{ uri: d.photo_url }} style={styles.historyImage} />
+                        ) : (
+                          <View style={[styles.historyImage, styles.historyImagePlaceholder]}>
+                            <FontAwesome name="heart" size={18} color={COLORS.secondary} />
+                          </View>
+                        )}
+                        <View style={styles.historyInfo}>
+                          <Text style={styles.historyItemTitle} numberOfLines={1}>{d.title}</Text>
+                          <Text style={styles.historyItemCategory}>{d.category}</Text>
+                          <Text style={styles.historyItemDate}>
+                            {new Date(d.created_at).toLocaleDateString('pt-BR')}
+                          </Text>
+                        </View>
+                        <View style={styles.historyBadgeReceived}>
+                          <Text style={styles.historyBadgeReceivedText}>Recebido</Text>
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </View>
+              )
             )}
 
             {activeTab === 'Favoritos' && (
@@ -447,4 +512,19 @@ const styles = StyleSheet.create({
   interestedUserName: { flex: 1, fontSize: 15, fontWeight: '600', color: '#000' },
   confirmModalClose: { marginTop: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
   confirmModalCloseText: { fontSize: 15, color: COLORS.textDark, fontWeight: '600' },
+
+  // History tab
+  historySection: { fontSize: 15, fontWeight: 'bold', color: '#000', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  historyEmpty: { paddingVertical: 20, alignItems: 'center' },
+  historyItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  historyImage: { width: 46, height: 46, borderRadius: 8, backgroundColor: COLORS.border, marginRight: 12 },
+  historyImagePlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  historyInfo: { flex: 1 },
+  historyItemTitle: { fontSize: 13, fontWeight: 'bold', color: '#000', marginBottom: 1 },
+  historyItemCategory: { fontSize: 12, color: COLORS.textLight, marginBottom: 2 },
+  historyItemDate: { fontSize: 11, color: COLORS.textLight },
+  historyBadgeDone: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: 'rgba(18,128,42,0.1)', borderWidth: 1, borderColor: COLORS.primary },
+  historyBadgeDoneText: { fontSize: 11, fontWeight: 'bold', color: COLORS.primary },
+  historyBadgeReceived: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: 'rgba(254,108,0,0.1)', borderWidth: 1, borderColor: COLORS.secondary },
+  historyBadgeReceivedText: { fontSize: 11, fontWeight: 'bold', color: COLORS.secondary },
 });
