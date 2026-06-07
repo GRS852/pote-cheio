@@ -16,10 +16,15 @@ interface DonorData {
 }
 
 export default function DonorProfileScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, name: paramName, avatar: paramAvatar } = useLocalSearchParams<{
+    id: string;
+    name?: string;
+    avatar?: string;
+  }>();
   const { token } = useAuth();
   const [donor, setDonor] = useState<DonorData | null>(null);
-  const [loading, setLoading] = useState(!!id);
+  // Show immediately from route params while API loads
+  const [loading, setLoading] = useState(!paramName && !!id);
 
   useEffect(() => {
     if (!id || !token) { setLoading(false); return; }
@@ -28,17 +33,32 @@ export default function DonorProfileScreen() {
         if (u) {
           setDonor({
             name: u.full_name,
-            avatarUrl: u.avatar_url ?? null,
+            avatarUrl: u.avatar_url ?? (paramAvatar || null),
+            memberSince: new Date().getFullYear().toString(),
+          });
+        } else if (paramName) {
+          // API returned nothing but we have route params — use them
+          setDonor({
+            name: paramName,
+            avatarUrl: paramAvatar || null,
             memberSince: new Date().getFullYear().toString(),
           });
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (paramName) {
+          setDonor({
+            name: paramName,
+            avatarUrl: paramAvatar || null,
+            memberSince: new Date().getFullYear().toString(),
+          });
+        }
+      })
       .finally(() => setLoading(false));
-  }, [id, token]);
+  }, [id, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const displayName = donor?.name ?? 'Usuário';
-  const displayAvatar = donor?.avatarUrl ?? null;
+  const displayName = donor?.name ?? paramName ?? 'Usuário';
+  const displayAvatar = donor?.avatarUrl ?? (paramAvatar || null);
   const memberSince = donor?.memberSince ?? new Date().getFullYear().toString();
 
   return (

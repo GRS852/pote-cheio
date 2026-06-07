@@ -306,7 +306,11 @@ export default function MessagesScreen() {
                   onPress={() =>
                     router.push({
                       pathname: '/(app)/donor-profile',
-                      params: { id: String(activeOtherUser.id) },
+                      params: {
+                        id: String(activeOtherUser.id),
+                        name: activeOtherUser.full_name,
+                        avatar: activeOtherUser.avatar_url ?? '',
+                      },
                     })
                   }
                 >
