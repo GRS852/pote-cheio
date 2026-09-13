@@ -212,7 +212,7 @@ const SUPABASE_ANON_KEY =
     : '';
 
 export async function getUserByIdRequest(
-  token: string,
+  token: string | null,
   userId: number
 ): Promise<Pick<Usuario, 'id' | 'full_name' | 'avatar_url'> | null> {
   // 1. Try Supabase REST API directly — avatars are stored there
@@ -258,7 +258,7 @@ export async function getUserByIdRequest(
   for (const path of endpoints) {
     try {
       const response = await fetch(`${API_URL}${path}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (!response.ok) continue;
       const data = await response.json();

@@ -42,7 +42,6 @@ export default function HomeScreen() {
   }, [searchQuery]);
 
   const loadFeed = useCallback(async () => {
-    if (!token) return;
     setLoading(true);
     try {
       const res = await getFeedRequest(token, {

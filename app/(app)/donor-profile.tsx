@@ -27,7 +27,7 @@ export default function DonorProfileScreen() {
   const [loading, setLoading] = useState(!paramName && !!id);
 
   useEffect(() => {
-    if (!id || !token) { setLoading(false); return; }
+    if (!id) { setLoading(false); return; }
     getUserByIdRequest(token, Number(id))
       .then(u => {
         if (u) {

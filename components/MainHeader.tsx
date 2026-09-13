@@ -177,26 +177,38 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
           </>
         )}
 
-        <TouchableOpacity style={styles.iconButton} onPress={handleBellPress}>
-          <FontAwesome name="bell-o" size={20} color={COLORS.secondary} />
-          {unreadCount > 0 && (
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {user ? (
+          <>
+            <TouchableOpacity style={styles.iconButton} onPress={handleBellPress}>
+              <FontAwesome name="bell-o" size={20} color={COLORS.secondary} />
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.avatarContainer}
-          onPress={() => setShowUserMenu(true)}
-          activeOpacity={0.8}
-        >
-          {user?.avatar_url ? (
-            <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} resizeMode="cover" />
-          ) : (
-            <Text style={styles.avatarText}>{userInitial}</Text>
-          )}
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.avatarContainer}
+              onPress={() => setShowUserMenu(true)}
+              activeOpacity={0.8}
+            >
+              {user?.avatar_url ? (
+                <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} resizeMode="cover" />
+              ) : (
+                <Text style={styles.avatarText}>{userInitial}</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.push('/(auth)/login')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginButtonText}>Entrar</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Side menu do usuário */}
@@ -318,6 +330,13 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
   avatarImage: { width: 35, height: 35, borderRadius: 17.5 },
+  loginButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+  },
+  loginButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
 
   // Modal overlay
   modalOverlay: {
