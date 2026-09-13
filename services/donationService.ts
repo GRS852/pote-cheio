@@ -57,9 +57,9 @@ export async function createDonationRequest(
   return data.donation;
 }
 
-export async function getDonationRequest(token: string, id: number): Promise<Donation> {
+export async function getDonationRequest(token: string | null, id: number): Promise<Donation> {
   const response = await fetch(`${API_URL}/donations/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (!response.ok) throw new Error(`Doação não encontrada (${response.status})`);
   const data = await response.json();

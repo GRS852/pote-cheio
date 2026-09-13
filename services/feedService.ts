@@ -25,7 +25,7 @@ export interface FeedResponse {
 }
 
 export async function getFeedRequest(
-  token: string,
+  token: string | null,
   params: { category?: string; search?: string; page?: number; limit?: number } = {}
 ): Promise<FeedResponse> {
   const query = new URLSearchParams();
@@ -35,7 +35,7 @@ export async function getFeedRequest(
   if (params.limit) query.set('limit', String(params.limit));
 
   const response = await fetch(`${API_URL}/feed?${query.toString()}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 
   if (!response.ok) throw new Error(`Erro ao carregar feed (${response.status})`);

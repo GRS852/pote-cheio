@@ -40,7 +40,7 @@ export default function ProductScreen() {
   const [conversationId, setConversationId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!token || !id) return;
+    if (!id) return;
     getDonationRequest(token, Number(id))
       .then(d => {
         setDonation(d);
@@ -51,7 +51,11 @@ export default function ProductScreen() {
   }, [token, id]);
 
   async function handleWishlist() {
-    if (!token || !donation) return;
+    if (!donation) return;
+    if (!token) {
+      router.push({ pathname: '/(auth)/login', params: { redirect: `/product?id=${donation.id}` } });
+      return;
+    }
     setWishlistLoading(true);
     try {
       if (inWishlist) {
@@ -165,7 +169,10 @@ export default function ProductScreen() {
                 <TouchableOpacity
                   style={styles.donorCard}
                   activeOpacity={0.8}
-                  onPress={() => router.push('/donor-profile')}
+                  onPress={() => router.push({
+                    pathname: '/donor-profile',
+                    params: { id: String(donation.donor!.id), name: donation.donor!.full_name },
+                  })}
                 >
                   <View style={styles.donorAvatar}>
                     <Text style={styles.donorAvatarLetter}>{donation.donor.full_name[0]}</Text>
