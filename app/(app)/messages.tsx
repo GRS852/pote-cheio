@@ -339,7 +339,7 @@ export default function MessagesScreen() {
         <View style={styles.securityBanner}>
           <Ionicons name="shield-checkmark-outline" size={14} color="#555" style={{ marginRight: 8, flexShrink: 0 }} />
           <Text style={styles.securityText}>
-            PetsBrasil não solicita seus dados por este chat. Ao suspeitar de algo, denuncie.
+            Pote Cheio não solicita seus dados por este chat. Ao suspeitar de algo, denuncie.
           </Text>
         </View>
 
