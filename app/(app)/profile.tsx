@@ -183,7 +183,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.mainContainer}>
-      <MainHeader />
+      <MainHeader showSearch={false} />
 
       {/* Modal: escolher usuário para confirmar doação */}
       <Modal
@@ -247,7 +247,6 @@ export default function ProfileScreen() {
           <ProfileImpactMetrics
             totalDonatedValue="R$0,00"
             itemsDonatedCount={completedCount}
-            animalsHelpedCount={0}
           />
 
           <View style={styles.tabsContainer}>

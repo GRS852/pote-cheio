@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { getMeRequest, signInRequest, signUpRequest, Usuario } from './authService';
+import { facebookSignInRequest, getMeRequest, googleSignInRequest, signInRequest, signUpRequest, Usuario } from './authService';
 
 async function saveToken(value: string) {
   if (Platform.OS === 'web') {
@@ -34,6 +34,8 @@ type AuthContextType = {
   token: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string, birthDate: string) => Promise<void>;
+  signInWithGoogle: (idToken: string) => Promise<void>;
+  signInWithFacebook: (accessToken: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateUserLocally: (partial: Partial<Usuario>) => void;
@@ -101,6 +103,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(true);
   }
 
+  async function signInWithGoogle(idToken: string) {
+    const data = await googleSignInRequest(idToken);
+
+    const received: string | undefined = data.token ?? data.access_token ?? data.jwt ?? data.authToken;
+
+    if (!received) {
+      throw new Error(
+        `Token não encontrado na resposta. Campos disponíveis: ${Object.keys(data ?? {}).join(', ')}`
+      );
+    }
+
+    await saveToken(received);
+    const usuario = await getMeRequest(received);
+    setToken(received);
+    setUser(usuario);
+    setIsAuthenticated(true);
+  }
+
+  async function signInWithFacebook(accessToken: string) {
+    const data = await facebookSignInRequest(accessToken);
+
+    const received: string | undefined = data.token ?? data.access_token ?? data.jwt ?? data.authToken;
+
+    if (!received) {
+      throw new Error(
+        `Token não encontrado na resposta. Campos disponíveis: ${Object.keys(data ?? {}).join(', ')}`
+      );
+    }
+
+    await saveToken(received);
+    const usuario = await getMeRequest(received);
+    setToken(received);
+    setUser(usuario);
+    setIsAuthenticated(true);
+  }
+
   async function signOut() {
     await removeToken();
     setToken(null);
@@ -121,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, token, signIn, signUp, signOut, refreshUser, updateUserLocally }}>
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, token, signIn, signUp, signInWithGoogle, signInWithFacebook, signOut, refreshUser, updateUserLocally }}>
       {children}
     </AuthContext.Provider>
   );

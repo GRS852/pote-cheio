@@ -6,7 +6,6 @@ import { COLORS } from '../constants/theme';
 export interface ProfileImpactMetricsProps {
   totalDonatedValue: string;
   itemsDonatedCount: number;
-  animalsHelpedCount: number;
 }
 
 function ComingSoonOverlay() {
@@ -22,7 +21,6 @@ function ComingSoonOverlay() {
 export default function ProfileImpactMetrics({
   totalDonatedValue,
   itemsDonatedCount,
-  animalsHelpedCount,
 }: ProfileImpactMetricsProps) {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
@@ -51,16 +49,6 @@ export default function ProfileImpactMetrics({
         </View>
       </View>
 
-      {/* Animais ajudados — EM BREVE */}
-      <View style={styles.column}>
-        <MaterialCommunityIcons name="dog" size={48} color={COLORS.primary} style={styles.icon} />
-        <View>
-          <Text style={styles.title}>Animais ajudados</Text>
-          <Text style={[styles.valueSmall, { color: COLORS.primary }]}>{animalsHelpedCount}</Text>
-        </View>
-        <ComingSoonOverlay />
-      </View>
-
     </View>
   );
 }
@@ -86,7 +74,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, color: '#000' },
   subtitle: { fontSize: 14, color: '#000' },
   value: { fontSize: 28, fontWeight: 'bold' },
-  valueSmall: { fontSize: 24, fontWeight: 'bold' },
 
   comingSoonOverlay: {
     ...StyleSheet.absoluteFillObject,

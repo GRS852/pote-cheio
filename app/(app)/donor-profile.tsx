@@ -63,7 +63,7 @@ export default function DonorProfileScreen() {
 
   return (
     <View style={styles.mainContainer}>
-      <MainHeader />
+      <MainHeader showSearch={false} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.contentWrapper}>
@@ -87,7 +87,6 @@ export default function DonorProfileScreen() {
               <ProfileImpactMetrics
                 totalDonatedValue=""
                 itemsDonatedCount={0}
-                animalsHelpedCount={0}
               />
             </>
           )}

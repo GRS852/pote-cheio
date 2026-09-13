@@ -16,6 +16,8 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleChange = (field: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+  const handleDateChange = (field: 'dia' | 'mes' | 'ano', value: string) =>
+    setForm(prev => ({ ...prev, [field]: value.replace(/[^0-9]/g, '') }));
 
   const handleRegister = async () => {
     setError('');
@@ -52,9 +54,9 @@ export default function RegisterScreen() {
 
             <Text style={styles.customLabel}>Data de nascimento</Text>
             <View style={styles.dateRow}>
-              <TextInput style={styles.dateInput} placeholder="Dia" placeholderTextColor={COLORS.textDark} value={form.dia} onChangeText={(t) => handleChange('dia', t)} keyboardType="numeric" maxLength={2} />
-              <TextInput style={[styles.dateInput, styles.middleInput]} placeholder="Mês" placeholderTextColor={COLORS.textDark} value={form.mes} onChangeText={(t) => handleChange('mes', t)} maxLength={2} />
-              <TextInput style={styles.dateInput} placeholder="Ano" placeholderTextColor={COLORS.textDark} value={form.ano} onChangeText={(t) => handleChange('ano', t)} keyboardType="numeric" maxLength={4} />
+              <TextInput style={styles.dateInput} placeholder="Dia" placeholderTextColor={COLORS.textDark} value={form.dia} onChangeText={(t) => handleDateChange('dia', t)} keyboardType="numeric" maxLength={2} />
+              <TextInput style={[styles.dateInput, styles.middleInput]} placeholder="Mês" placeholderTextColor={COLORS.textDark} value={form.mes} onChangeText={(t) => handleDateChange('mes', t)} keyboardType="numeric" maxLength={2} />
+              <TextInput style={styles.dateInput} placeholder="Ano" placeholderTextColor={COLORS.textDark} value={form.ano} onChangeText={(t) => handleDateChange('ano', t)} keyboardType="numeric" maxLength={4} />
             </View>
 
             <Input label="Email" placeholder="seu@email.com" value={form.email} onChangeText={(t) => handleChange('email', t)} />
@@ -64,7 +66,7 @@ export default function RegisterScreen() {
             <Button title="Continuar" onPress={handleRegister} loading={loading} />
 
             <Text style={styles.termsText}>
-              Ao se inscrever, você concorda com os <Text style={styles.linkText}>termos de serviço</Text> e a <Text style={styles.linkText}>Política de Privacidade</Text>
+              Ao se inscrever, você concorda com os <Link href={"/terms" as any} style={styles.linkText}>termos de serviço</Link> e a <Text style={styles.linkText}>Política de Privacidade</Text>
             </Text>
           </View>
 

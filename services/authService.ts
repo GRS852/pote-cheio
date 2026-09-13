@@ -91,6 +91,42 @@ export async function signUpRequest(
   return response.json();
 }
 
+export async function googleSignInRequest(idToken: string) {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_token: idToken }),
+    });
+  } catch {
+    throw new NetworkError();
+  }
+
+  if (response.status === 401 || response.status === 403) throw new AuthError('Não foi possível validar sua conta Google.');
+  if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
+
+  return response.json();
+}
+
+export async function facebookSignInRequest(accessToken: string) {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/facebook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: accessToken }),
+    });
+  } catch {
+    throw new NetworkError();
+  }
+
+  if (response.status === 401 || response.status === 403) throw new AuthError('Não foi possível validar sua conta Facebook.');
+  if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
+
+  return response.json();
+}
+
 export async function updateProfileRequest(
   token: string,
   payload: { avatar_url?: string | null; full_name?: string }

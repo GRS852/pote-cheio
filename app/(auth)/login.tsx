@@ -1,6 +1,9 @@
 import { FontAwesome } from '@expo/vector-icons';
+import * as AuthSession from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
 import { Link } from 'expo-router';
-import { useState } from 'react';
+import * as WebBrowser from 'expo-web-browser';
+import { useEffect, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import AuthHeader from '../../components/AuthHeader';
@@ -10,13 +13,73 @@ import { COLORS } from '../../constants/theme';
 import { AuthError, NetworkError } from '../../services/authService';
 import { useAuth } from '../../services/AuthContext';
 
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB ?? '';
+const FACEBOOK_APP_ID = process.env.EXPO_PUBLIC_FACEBOOK_APP_ID ?? '';
+
+const facebookDiscovery = {
+  authorizationEndpoint: 'https://www.facebook.com/v19.0/dialog/oauth',
+};
+
 export default function LoginScreen() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | null>(null);
   const [error, setError] = useState('');
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle, signInWithFacebook } = useAuth();
+
+  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
+    webClientId: GOOGLE_CLIENT_ID,
+    responseType: AuthSession.ResponseType.IdToken,
+    scopes: ['openid', 'profile', 'email'],
+  });
+
+  const [facebookRequest, facebookResponse, promptFacebookAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: FACEBOOK_APP_ID,
+      scopes: ['public_profile', 'email'],
+      responseType: AuthSession.ResponseType.Token,
+      redirectUri: AuthSession.makeRedirectUri(),
+    },
+    facebookDiscovery
+  );
+
+  useEffect(() => {
+    if (googleResponse?.type !== 'success') return;
+    const idToken = googleResponse.authentication?.idToken ?? (googleResponse.params as any)?.id_token;
+    if (!idToken) return;
+    (async () => {
+      setError('');
+      setSocialLoading('google');
+      try {
+        await signInWithGoogle(idToken);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Não foi possível entrar com Google.');
+      } finally {
+        setSocialLoading(null);
+      }
+    })();
+  }, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (facebookResponse?.type !== 'success') return;
+    const accessToken = facebookResponse.authentication?.accessToken;
+    if (!accessToken) return;
+    (async () => {
+      setError('');
+      setSocialLoading('facebook');
+      try {
+        await signInWithFacebook(accessToken);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Não foi possível entrar com Facebook.');
+      } finally {
+        setSocialLoading(null);
+      }
+    })();
+  }, [facebookResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (field: keyof typeof form, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -85,16 +148,34 @@ export default function LoginScreen() {
 
             <View style={styles.socialRow}>
               <View style={styles.socialButtonWrapper}>
-                <Button title="Facebook" variant="outline" icon={<FontAwesome name="facebook" size={24} color="#1877F2" />} onPress={() => {}} />
-                <View style={styles.comingSoonOverlay} pointerEvents="none">
-                  <Text style={styles.comingSoonText}>Em Breve</Text>
-                </View>
+                <Button
+                  title="Facebook"
+                  variant="outline"
+                  icon={<FontAwesome name="facebook" size={24} color="#1877F2" />}
+                  onPress={() => promptFacebookAsync()}
+                  loading={socialLoading === 'facebook'}
+                  disabled={!facebookRequest || socialLoading !== null}
+                />
+                {!FACEBOOK_APP_ID && (
+                  <View style={styles.comingSoonOverlay} pointerEvents="none">
+                    <Text style={styles.comingSoonText}>Em Breve</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.socialButtonWrapper}>
-                <Button title="Google" variant="outline" icon={<FontAwesome name="google" size={24} color="#DB4437" />} onPress={() => {}} />
-                <View style={styles.comingSoonOverlay} pointerEvents="none">
-                  <Text style={styles.comingSoonText}>Em Breve</Text>
-                </View>
+                <Button
+                  title="Google"
+                  variant="outline"
+                  icon={<FontAwesome name="google" size={24} color="#DB4437" />}
+                  onPress={() => promptGoogleAsync()}
+                  loading={socialLoading === 'google'}
+                  disabled={!googleRequest || socialLoading !== null}
+                />
+                {!GOOGLE_CLIENT_ID && (
+                  <View style={styles.comingSoonOverlay} pointerEvents="none">
+                    <Text style={styles.comingSoonText}>Em Breve</Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -103,7 +184,7 @@ export default function LoginScreen() {
             </Text>
             
             <Text style={styles.termsText}>
-              Ao se inscrever, você concorda com os <Text style={styles.linkText}>termos de serviço</Text> e a <Text style={styles.linkText}>Política de Privacidade</Text>
+              Ao se inscrever, você concorda com os <Link href={"/terms" as any} style={styles.linkText}>termos de serviço</Link> e a <Text style={styles.linkText}>Política de Privacidade</Text>
             </Text>
           </View>
         </View>

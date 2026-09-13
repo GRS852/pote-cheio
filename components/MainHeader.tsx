@@ -47,9 +47,10 @@ function notifIconInfo(type: string): { name: string; color: string; bg: string 
 interface MainHeaderProps {
   searchValue?: string;
   onSearchChange?: (text: string) => void;
+  showSearch?: boolean;
 }
 
-export default function MainHeader({ searchValue, onSearchChange }: MainHeaderProps = {}) {
+export default function MainHeader({ searchValue, onSearchChange, showSearch = true }: MainHeaderProps = {}) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -151,16 +152,18 @@ export default function MainHeader({ searchValue, onSearchChange }: MainHeaderPr
         <Image source={require('../assets/images/logo.png')} style={styles.logoIcon} resizeMode="contain" />
       </TouchableOpacity>
 
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Procure itens"
-          placeholderTextColor={COLORS.textDark}
-          value={searchValue}
-          onChangeText={onSearchChange}
-        />
-        <FontAwesome name="search" size={16} color={COLORS.textDark} style={styles.searchIcon} />
-      </View>
+      {showSearch && (
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Procure itens"
+            placeholderTextColor={COLORS.textDark}
+            value={searchValue}
+            onChangeText={onSearchChange}
+          />
+          <FontAwesome name="search" size={16} color={COLORS.textDark} style={styles.searchIcon} />
+        </View>
+      )}
 
       <View style={[styles.rightSection, { gap: isMobile ? 12 : 20 }]}>
         {!isMobile && (

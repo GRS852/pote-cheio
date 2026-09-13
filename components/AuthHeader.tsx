@@ -21,7 +21,7 @@ export default function AuthHeader({ activeTab }: AuthHeaderProps) {
         >
           <Image source={require('../assets/images/logo.png')} style={styles.logoIcon} resizeMode="contain" />
           <Text style={styles.title}>
-            <Text style={{color: COLORS.primary}}>Pets</Text> <Text style={{color: COLORS.secondary}}>Brasil</Text>
+            <Text style={{color: COLORS.primary}}>Pote</Text> <Text style={{color: COLORS.secondary}}>Cheio</Text>
           </Text>
           {activeTab && (
             <View style={styles.activeTab}>

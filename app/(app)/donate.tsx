@@ -120,10 +120,10 @@ export default function DonateScreen() {
               )}
             </TouchableOpacity>
 
-            <Text style={styles.label}>Título do item</Text>
+            <Text style={styles.label}>Título do item *</Text>
             <TextInput style={styles.input} placeholder="Ex: Coleira vermelha tamanho M" placeholderTextColor={COLORS.textDark} value={title} onChangeText={setTitle} />
 
-            <Text style={styles.label}>Categoria</Text>
+            <Text style={styles.label}>Categoria *</Text>
             <View style={styles.pillRow}>
               {CATEGORIES.map(cat => (
                 <TouchableOpacity key={cat} style={[styles.pill, category === cat && styles.pillActive]} onPress={() => setCategory(cat)} activeOpacity={0.8}>
@@ -135,8 +135,10 @@ export default function DonateScreen() {
             <Text style={styles.label}>Quantidade (opcional)</Text>
             <TextInput style={styles.input} placeholder="Ex: 2" placeholderTextColor={COLORS.textDark} value={quantity} onChangeText={setQuantity} keyboardType="numeric" />
 
-            <Text style={styles.label}>Descrição</Text>
+            <Text style={styles.label}>Descrição *</Text>
             <TextInput style={[styles.input, styles.textarea]} placeholder="Descreva o estado do item, tamanho, observações..." placeholderTextColor={COLORS.textDark} value={description} onChangeText={setDescription} multiline numberOfLines={4} textAlignVertical="top" />
+
+            <Text style={styles.requiredNote}>* campos obrigatórios</Text>
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -171,4 +173,5 @@ const styles = StyleSheet.create({
   imagePlaceholderText: { color: COLORS.textLight, fontSize: 14 },
   imagePreview: { width: '100%', height: 220 },
   errorText: { color: '#C0392B', fontSize: 14, marginBottom: 12, textAlign: 'center' },
+  requiredNote: { fontSize: 12, color: COLORS.textLight, marginBottom: 12 },
 });

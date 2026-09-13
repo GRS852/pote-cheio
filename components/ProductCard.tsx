@@ -10,9 +10,10 @@ export interface ProductCardProps {
   onPress: () => void;
   location?: string;
   in_wishlist?: boolean;
+  isOwn?: boolean;
 }
 
-export default function ProductCard({ title, category, imageUrl, onPress, location, in_wishlist }: ProductCardProps) {
+export default function ProductCard({ title, category, imageUrl, onPress, location, in_wishlist, isOwn }: ProductCardProps) {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
       <View style={styles.imageWrapper}>
@@ -21,6 +22,11 @@ export default function ProductCard({ title, category, imageUrl, onPress, locati
         ) : (
           <View style={[styles.image, styles.imagePlaceholder]}>
             <FontAwesome name="image" size={32} color={COLORS.textLight} />
+          </View>
+        )}
+        {isOwn && (
+          <View style={styles.ownBadge}>
+            <Text style={styles.ownBadgeText}>SUA PUBLICAÇÃO</Text>
           </View>
         )}
         {in_wishlist && (
@@ -58,6 +64,8 @@ const styles = StyleSheet.create({
   image: { width: '100%', aspectRatio: 1, backgroundColor: COLORS.border },
   imagePlaceholder: { justifyContent: 'center', alignItems: 'center' },
   wishlistBadge: { position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: 12, backgroundColor: COLORS.secondary, justifyContent: 'center', alignItems: 'center' },
+  ownBadge: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: COLORS.primary },
+  ownBadgeText: { fontSize: 9, fontWeight: 'bold', color: '#FFF', letterSpacing: 0.3 },
   infoContainer: { padding: 12 },
   title: { fontSize: 14, fontWeight: 'bold', color: '#000', marginBottom: 10, minHeight: 34 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
