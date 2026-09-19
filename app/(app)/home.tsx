@@ -128,7 +128,7 @@ export default function HomeScreen() {
                         category={donation.category}
                         imageUrl={donation.photo_url}
                         in_wishlist={donation.in_wishlist}
-                        isOwn={donation.donor_id === user?.id}
+                        isOwn={!!user && donation.donor_id === user.id}
                         onPress={() => router.push({ pathname: '/product', params: { id: String(donation.id) } })}
                       />
                     ))}

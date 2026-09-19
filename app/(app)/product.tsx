@@ -110,7 +110,7 @@ export default function ProductScreen() {
     );
   }
 
-  const isOwner = user?.id === donation.donor_id;
+  const isOwner = !!user && user.id === donation.donor_id;
 
   return (
     <View style={styles.mainContainer}>
