@@ -1,13 +1,16 @@
+import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import MainHeader from '../../components/MainHeader';
 import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
 import ProfileUserInfo from '../../components/ProfileUserInfo';
-import { COLORS } from '../../constants/theme';
+import RatingStars from '../../components/RatingStars';
+import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import { getUserByIdRequest } from '../../services/authService';
+import { DonorFeedback, DonorRatingSummary, getUserFeedbackRequest, getUserRatingSummaryRequest } from '../../services/transactionService';
 
 interface DonorData {
   name: string;
@@ -25,6 +28,8 @@ export default function DonorProfileScreen() {
   const [donor, setDonor] = useState<DonorData | null>(null);
   // Show immediately from route params while API loads
   const [loading, setLoading] = useState(!paramName && !!id);
+  const [ratingSummary, setRatingSummary] = useState<DonorRatingSummary>({ average: null, count: 0 });
+  const [feedback, setFeedback] = useState<DonorFeedback[]>([]);
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -57,6 +62,12 @@ export default function DonorProfileScreen() {
       .finally(() => setLoading(false));
   }, [id, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!id) return;
+    getUserRatingSummaryRequest(Number(id)).then(setRatingSummary).catch(() => {});
+    getUserFeedbackRequest(Number(id)).then(setFeedback).catch(() => {});
+  }, [id]);
+
   const displayName = donor?.name ?? paramName ?? 'Usuário';
   const displayAvatar = donor?.avatarUrl ?? (paramAvatar || null);
   const memberSince = donor?.memberSince ?? new Date().getFullYear().toString();
@@ -88,6 +99,38 @@ export default function DonorProfileScreen() {
                 totalDonatedValue=""
                 itemsDonatedCount={0}
               />
+
+              <View style={styles.ratingSummaryRow}>
+                <RatingStars value={ratingSummary.average ?? 0} size={20} />
+                <Text style={styles.ratingSummaryText}>
+                  {ratingSummary.average != null
+                    ? `${ratingSummary.average.toFixed(1)} (${ratingSummary.count} avaliação${ratingSummary.count === 1 ? '' : 'ões'})`
+                    : 'Ainda sem avaliações'}
+                </Text>
+              </View>
+
+              <Text style={styles.feedbackSectionTitle}>Comentários de quem já recebeu doações</Text>
+              {feedback.length === 0 ? (
+                <Text style={styles.feedbackEmpty}>Nenhum comentário ainda.</Text>
+              ) : (
+                feedback.map(item => (
+                  <View key={item.id} style={styles.feedbackCard}>
+                    <View style={styles.feedbackCardHeader}>
+                      <Text style={styles.feedbackAuthor}>{item.recipient_name}</Text>
+                      <Text style={styles.feedbackDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
+                    </View>
+                    <Text style={styles.feedbackDonationTitle}>sobre &quot;{item.donation_title}&quot;</Text>
+                    <Text style={styles.feedbackComment}>{item.comment}</Text>
+                    {item.photos.length > 0 && (
+                      <View style={styles.feedbackPhotoRow}>
+                        {item.photos.map(url => (
+                          <Image key={url} source={{ uri: url }} style={styles.feedbackPhoto} resizeMode="cover" />
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
             </>
           )}
 
@@ -102,4 +145,16 @@ const styles = StyleSheet.create({
   scrollContainer: { flexGrow: 1, paddingBottom: 60 },
   contentWrapper: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: 30 },
   pageTitle: { fontSize: 24, fontWeight: 'bold', color: '#000', marginBottom: 20 },
+  ratingSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
+  ratingSummaryText: { fontSize: 14, color: COLORS.textDark },
+  feedbackSectionTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.secondary, marginTop: 28, marginBottom: 12, textTransform: 'uppercase' },
+  feedbackEmpty: { fontSize: 14, color: COLORS.textLight },
+  feedbackCard: { backgroundColor: '#FFF', borderRadius: SIZES.radius, padding: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
+  feedbackCardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  feedbackAuthor: { fontSize: 14, fontWeight: 'bold', color: '#000' },
+  feedbackDate: { fontSize: 12, color: COLORS.textLight },
+  feedbackDonationTitle: { fontSize: 12, color: COLORS.textLight, fontStyle: 'italic', marginBottom: 8 },
+  feedbackComment: { fontSize: 14, color: COLORS.textDark, lineHeight: 20 },
+  feedbackPhotoRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  feedbackPhoto: { width: 64, height: 64, borderRadius: 8, backgroundColor: COLORS.border },
 });

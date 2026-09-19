@@ -150,13 +150,12 @@ export async function confirmDonationRequest(
   token: string,
   donationId: number,
   userId: number
-): Promise<Donation> {
+): Promise<{ donation: Donation; transaction_id: number }> {
   const response = await fetch(`${API_URL}/donations/${donationId}/confirm`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ user_id: userId }),
   });
   if (!response.ok) throw new Error('Erro ao confirmar doação');
-  const data = await response.json();
-  return data.donation;
+  return response.json();
 }

@@ -1,5 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -37,6 +38,7 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('Minhas doações');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -168,9 +170,10 @@ export default function ProfileScreen() {
   async function handleConfirmToUser(donationId: number, userId: number) {
     if (!token) return;
     try {
-      const updated = await confirmDonationRequest(token, donationId, userId);
-      setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: updated.status } : d));
+      const { donation } = await confirmDonationRequest(token, donationId, userId);
+      setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: donation.status } : d));
       setConfirmModalDonationId(null);
+      router.push({ pathname: '/transaction', params: { id: String(donationId) } });
     } catch {
       setActionError('Não foi possível confirmar a doação.');
     }
@@ -301,9 +304,18 @@ export default function ProfileScreen() {
                             <Text style={styles.actionChipText}>Reservar</Text>
                           </TouchableOpacity>
                         )}
-                        {d.status !== 'completed' && (
+                        {d.status === 'available' && (
                           <TouchableOpacity style={[styles.actionChip, styles.actionChipGreen]} onPress={() => handleOpenConfirmModal(d.id)} activeOpacity={0.7}>
                             <Text style={[styles.actionChipText, styles.actionChipTextGreen]}>Concluir</Text>
+                          </TouchableOpacity>
+                        )}
+                        {(d.status === 'reserved' || d.status === 'completed') && (
+                          <TouchableOpacity
+                            style={[styles.actionChip, styles.actionChipGreen]}
+                            onPress={() => router.push({ pathname: '/transaction', params: { id: String(d.id) } })}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.actionChipText, styles.actionChipTextGreen]}>Ver envio</Text>
                           </TouchableOpacity>
                         )}
                         <TouchableOpacity style={[styles.actionChip, styles.actionChipDanger]} onPress={() => handleDeleteDonation(d.id)} activeOpacity={0.7}>
@@ -394,7 +406,13 @@ export default function ProfileScreen() {
               ) : (
                 <View style={styles.wishlistGrid}>
                   {wishlist.map(item => (
-                    <View key={item.id} style={styles.wishlistCard}>
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.wishlistCard}
+                      activeOpacity={item.status === 'available' ? 1 : 0.7}
+                      disabled={item.status === 'available'}
+                      onPress={() => router.push({ pathname: '/transaction', params: { id: String(item.id) } })}
+                    >
                       {item.photo_url ? (
                         <Image source={{ uri: item.photo_url }} style={styles.wishlistImage} resizeMode="cover" />
                       ) : (
@@ -405,8 +423,13 @@ export default function ProfileScreen() {
                       <View style={styles.wishlistCardInfo}>
                         <Text style={styles.wishlistCardTitle} numberOfLines={1}>{item.title}</Text>
                         <Text style={styles.wishlistCardCategory}>{item.category}</Text>
+                        {item.status !== 'available' && (
+                          <Text style={styles.wishlistTrackLink}>
+                            {item.status === 'reserved' ? 'Acompanhar pedido' : 'Ver detalhes'}
+                          </Text>
+                        )}
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   ))}
                 </View>
               )
@@ -487,6 +510,7 @@ const styles = StyleSheet.create({
   wishlistCardInfo: { padding: 8 },
   wishlistCardTitle: { fontSize: 12, fontWeight: 'bold', color: '#000', marginBottom: 2 },
   wishlistCardCategory: { fontSize: 11, color: COLORS.textLight },
+  wishlistTrackLink: { fontSize: 11, color: COLORS.primary, fontWeight: '600', marginTop: 4 },
 
   // Logout
   logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 32, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#C0392B', backgroundColor: '#FFF5F5' },
