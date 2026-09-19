@@ -1,11 +1,17 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { COLORS, SIZES } from '../../../constants/theme';
 import { useAdminAuth } from '../../../services/AdminAuthContext';
-import { AdminUserActivity, getAdminConversationMessagesRequest, getAdminUserActivityRequest } from '../../../services/adminService';
+import { AdminUserActivity, getAdminConversationMessagesRequest, getAdminUserActivityRequest, reactivateUserRequest } from '../../../services/adminService';
+
+const ACTION_LABELS: Record<string, string> = {
+  warning: 'Advertência',
+  disable_account: 'Conta desativada',
+  reactivate_account: 'Conta reativada',
+};
 
 interface AdminMessage {
   id: number;
@@ -77,7 +83,15 @@ export default function AdminUserActivityScreen() {
     );
   }
 
-  const { user, donations, wishlist, donation_history, conversations, reports_made, reports_against } = data;
+  const { user, donations, wishlist, donation_history, conversations, reports_made, reports_against, moderation_history, warning_count } = data;
+
+  async function handleReactivate() {
+    if (!adminToken) return;
+    Alert.alert('Reativar conta', `Reativar a conta de ${user.full_name ?? user.email}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Reativar', onPress: async () => { await reactivateUserRequest(adminToken, user.id); load(); } },
+    ]);
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -91,21 +105,44 @@ export default function AdminUserActivityScreen() {
           <Text style={styles.profileAvatarLetter}>{(user.full_name ?? user.email)[0]?.toUpperCase()}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.profileName}>{user.full_name ?? 'Sem nome'}</Text>
+          <View style={styles.profileNameRow}>
+            <Text style={styles.profileName}>{user.full_name ?? 'Sem nome'}</Text>
+            {user.status === 'disabled' && (
+              <View style={styles.statusBadgeDisabled}>
+                <Text style={styles.statusBadgeText}>DESATIVADA</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.profileEmail}>{user.email}</Text>
           <Text style={styles.profileMeta}>
             Membro desde {new Date(user.created_at).toLocaleDateString('pt-BR')}
             {user.phone ? ` · ${user.phone}` : ''}
           </Text>
         </View>
+        {user.status === 'disabled' && (
+          <TouchableOpacity style={styles.reactivateBtn} onPress={handleReactivate}>
+            <Text style={styles.reactivateBtnText}>Reativar</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {reports_against.length > 0 && (
+      {(warning_count > 0 || reports_against.length > 0 || (user.banned_until && new Date(user.banned_until) > new Date())) && (
         <View style={styles.warningBanner}>
           <FontAwesome name="exclamation-triangle" size={14} color="#B35A00" />
-          <Text style={styles.warningText}>
-            Este usuário já foi denunciado {reports_against.length}x.
-          </Text>
+          <View style={{ flex: 1 }}>
+            {reports_against.length > 0 && (
+              <Text style={styles.warningText}>Este usuário já foi denunciado {reports_against.length}x.</Text>
+            )}
+            <Text style={[styles.warningText, warning_count >= 3 && styles.warningTextDanger]}>
+              {warning_count} advertência{warning_count === 1 ? '' : 's'}
+              {warning_count >= 3 ? ' — no limite recomendado para exclusão de conta' : ''}
+            </Text>
+            {user.banned_until && new Date(user.banned_until) > new Date() && (
+              <Text style={styles.warningTextDanger}>
+                Banido até {new Date(user.banned_until).toLocaleString('pt-BR')}
+              </Text>
+            )}
+          </View>
         </View>
       )}
 
@@ -181,6 +218,25 @@ export default function AdminUserActivityScreen() {
         )}
       </SectionCard>
 
+      <SectionCard title={`Histórico de moderação (${moderation_history.length})`} icon="gavel">
+        {moderation_history.length === 0 ? (
+          <Text style={styles.emptyText}>Nenhuma ação de moderação registrada.</Text>
+        ) : (
+          moderation_history.map(a => (
+            <View key={a.id} style={styles.row}>
+              <Text style={styles.rowTitle}>
+                {ACTION_LABELS[a.action_type] ?? a.action_type}
+                {a.ban_days ? ` — banimento de ${a.ban_days} dia${a.ban_days === 1 ? '' : 's'}` : ''}
+              </Text>
+              <Text style={styles.rowMeta}>
+                Por {a.admin_name} em {new Date(a.created_at).toLocaleString('pt-BR')}
+                {a.reason ? ` — ${a.reason}` : ''}
+              </Text>
+            </View>
+          ))
+        )}
+      </SectionCard>
+
       <SectionCard title={`Denúncias feitas por ele (${reports_made.length})`} icon="flag-o">
         {reports_made.length === 0 ? (
           <Text style={styles.emptyText}>Nenhuma.</Text>
@@ -237,18 +293,24 @@ const styles = StyleSheet.create({
   },
   profileAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.secondary, alignItems: 'center', justifyContent: 'center' },
   profileAvatarLetter: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
+  profileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   profileName: { fontSize: 18, fontWeight: 'bold', color: '#000' },
+  statusBadgeDisabled: { backgroundColor: '#C0392B', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  statusBadgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
   profileEmail: { fontSize: 13, color: COLORS.textDark },
   profileMeta: { fontSize: 12, color: COLORS.textLight, marginTop: 2 },
+  reactivateBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: SIZES.radius, borderWidth: 1.5, borderColor: COLORS.primary, alignSelf: 'flex-start' },
+  reactivateBtnText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 13 },
   warningBanner: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     backgroundColor: '#FFE5CC',
     borderRadius: SIZES.radius,
     padding: 12,
   },
   warningText: { color: '#B35A00', fontWeight: '600', fontSize: 13 },
+  warningTextDanger: { color: '#C0392B', fontWeight: '700', fontSize: 13, marginTop: 4 },
   section: { backgroundColor: '#FFF', borderRadius: SIZES.radius, padding: 18, borderWidth: 1, borderColor: COLORS.border },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#000' },

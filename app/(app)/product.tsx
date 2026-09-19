@@ -221,6 +221,8 @@ export default function ProductScreen() {
         onClose={() => setShowReportModal(false)}
         targetType="donation"
         targetId={donation.id}
+        photoUrl={donation.photo_url}
+        targetTitle={donation.title}
       />
     </View>
   );

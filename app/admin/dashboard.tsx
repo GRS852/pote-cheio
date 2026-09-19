@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View }
 
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAdminAuth } from '../../services/AdminAuthContext';
-import { AdminReport, getAdminReportsRequest } from '../../services/adminService';
+import { AdminReport, AdminStats, getAdminReportsRequest, getAdminStatsRequest } from '../../services/adminService';
 import { REPORT_REASONS } from '../../services/reportService';
 
 type StatusFilter = 'pending' | 'reviewing' | 'resolved' | 'dismissed' | 'all';
@@ -42,6 +42,7 @@ export default function AdminDashboardScreen() {
   const { admin, adminToken, adminSignOut } = useAdminAuth();
   const [filter, setFilter] = useState<StatusFilter>('pending');
   const [reports, setReports] = useState<AdminReport[]>([]);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadReports = useCallback(async () => {
@@ -57,7 +58,18 @@ export default function AdminDashboardScreen() {
     }
   }, [adminToken, filter]);
 
+  const loadStats = useCallback(async () => {
+    if (!adminToken) return;
+    try {
+      const data = await getAdminStatsRequest(adminToken);
+      setStats(data);
+    } catch {
+      setStats(null);
+    }
+  }, [adminToken]);
+
   useEffect(() => { loadReports(); }, [loadReports]);
+  useEffect(() => { loadStats(); }, [loadStats]);
 
   return (
     <View style={styles.container}>
@@ -67,12 +79,45 @@ export default function AdminDashboardScreen() {
           <Text style={styles.headerTitle}>Painel do Administrador</Text>
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => router.push('/admin/accounts')} style={styles.accountsLink}>
+            <FontAwesome name="user-times" size={14} color={COLORS.textDark} />
+            <Text style={styles.accountsLinkText}>Contas desativadas</Text>
+          </TouchableOpacity>
           <Text style={styles.adminName}>{admin?.full_name ?? admin?.email}</Text>
           <TouchableOpacity onPress={adminSignOut} style={styles.logoutBtn}>
             <FontAwesome name="sign-out" size={16} color="#C0392B" />
           </TouchableOpacity>
         </View>
       </View>
+
+      {stats && (
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats.active_accounts}</Text>
+            <Text style={styles.statLabel}>Contas ativas</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats.recent_accounts}</Text>
+            <Text style={styles.statLabel}>Novas (7 dias)</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: '#B35A00' }]}>{stats.reports.pending}</Text>
+            <Text style={styles.statLabel}>Pendentes</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: '#0B5DBB' }]}>{stats.reports.reviewing}</Text>
+            <Text style={styles.statLabel}>Em análise</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: COLORS.primary }]}>{stats.reports.resolved}</Text>
+            <Text style={styles.statLabel}>Resolvidas</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: '#C0392B' }]}>{stats.disabled_accounts}</Text>
+            <Text style={styles.statLabel}>Contas desativadas</Text>
+          </View>
+        </View>
+      )}
 
       <View style={styles.tabsRow}>
         {STATUS_TABS.map(tab => (
@@ -107,16 +152,21 @@ export default function AdminDashboardScreen() {
                 onPress={() => router.push({ pathname: '/admin/report/[id]', params: { id: String(item.id) } })}
               >
                 <View style={styles.cardTop}>
-                  <FontAwesome
-                    name={item.target_type === 'donation' ? 'file-text-o' : 'comment-o'}
-                    size={14}
-                    color={COLORS.textLight}
-                  />
-                  <Text style={styles.cardReason}>{reasonLabel(item.reason)}</Text>
+                  <View style={styles.typeTag}>
+                    <FontAwesome
+                      name={item.target_type === 'donation' ? 'file-text-o' : 'comment-o'}
+                      size={11}
+                      color="#FFF"
+                    />
+                    <Text style={styles.typeTagText}>
+                      {item.target_type === 'donation' ? 'Denúncia de Post' : 'Denúncia de Chat'}
+                    </Text>
+                  </View>
                   <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
                     <Text style={[styles.statusBadgeText, { color: statusStyle.text }]}>{item.status}</Text>
                   </View>
                 </View>
+                <Text style={styles.cardReason}>{reasonLabel(item.reason)}</Text>
                 <Text style={styles.cardDetail}>
                   {item.target_type === 'donation' ? item.donation_title ?? 'Publicação' : 'Conversa'} · denunciado por{' '}
                   <Text style={styles.bold}>{item.reporter_name ?? 'Usuário'}</Text>
@@ -126,6 +176,12 @@ export default function AdminDashboardScreen() {
                     </>
                   ) : null}
                 </Text>
+                {item.assigned_admin_name && (
+                  <View style={styles.lockRow}>
+                    <FontAwesome name="lock" size={11} color="#0B5DBB" />
+                    <Text style={styles.lockText}>Em análise — Administrador {item.assigned_admin_name}</Text>
+                  </View>
+                )}
                 <Text style={styles.cardTime}>{timeAgo(item.created_at)}</Text>
               </TouchableOpacity>
             );
@@ -151,8 +207,23 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#000' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  accountsLink: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  accountsLinkText: { fontSize: 13, color: COLORS.textDark, fontWeight: '600' },
   adminName: { fontSize: 13, color: COLORS.textDark },
   logoutBtn: { padding: 6 },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 20, paddingTop: 16 },
+  statCard: {
+    flexGrow: 1,
+    minWidth: 100,
+    backgroundColor: '#FFF',
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  statValue: { fontSize: 22, fontWeight: 'bold', color: '#000' },
+  statLabel: { fontSize: 11, color: COLORS.textLight, marginTop: 2, textAlign: 'center' },
   tabsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingVertical: 14 },
   tab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 18, backgroundColor: '#FFF', borderWidth: 1, borderColor: COLORS.border },
   tabActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
@@ -160,12 +231,16 @@ const styles = StyleSheet.create({
   tabTextActive: { color: '#FFF' },
   list: { paddingHorizontal: 20, paddingBottom: 40, gap: 12 },
   card: { backgroundColor: '#FFF', borderRadius: SIZES.radius, padding: 16, borderWidth: 1, borderColor: COLORS.border, gap: 6 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardReason: { fontSize: 15, fontWeight: 'bold', color: '#000', flex: 1 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  typeTag: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.secondary, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10 },
+  typeTagText: { color: '#FFF', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
+  cardReason: { fontSize: 15, fontWeight: 'bold', color: '#000' },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
   statusBadgeText: { fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase' },
   cardDetail: { fontSize: 13, color: COLORS.textDark },
   bold: { fontWeight: '700', color: '#000' },
+  lockRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  lockText: { fontSize: 12, color: '#0B5DBB', fontWeight: '600' },
   cardTime: { fontSize: 12, color: COLORS.textLight },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: 12 },
   emptyText: { fontSize: 14, color: COLORS.textLight },

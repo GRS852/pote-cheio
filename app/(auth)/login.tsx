@@ -10,7 +10,7 @@ import AuthHeader from '../../components/AuthHeader';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { COLORS } from '../../constants/theme';
-import { AuthError, NetworkError } from '../../services/authService';
+import { AccountBannedError, AccountDisabledError, AuthError, NetworkError } from '../../services/authService';
 import { useAuth } from '../../services/AuthContext';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -98,6 +98,11 @@ export default function LoginScreen() {
     } catch (err) {
       if (err instanceof NetworkError) {
         setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
+      } else if (err instanceof AccountDisabledError) {
+        setError('Esta conta foi desativada. Entre em contato com o suporte se acredita que isso é um engano.');
+      } else if (err instanceof AccountBannedError) {
+        const until = new Date(err.bannedUntil).toLocaleString('pt-BR');
+        setError(`Sua conta está temporariamente banida até ${until}.`);
       } else if (err instanceof AuthError) {
         setError('E-mail ou senha inválidos. Tente novamente.');
       } else {
