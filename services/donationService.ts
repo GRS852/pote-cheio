@@ -9,6 +9,7 @@ export interface Donation {
   description: string;
   category: string;
   photo_url: string | null;
+  photos: string[];
   quantity: number | null;
   status: DonationStatus;
   in_wishlist: boolean;
@@ -25,7 +26,7 @@ export interface CreateDonationPayload {
   title: string;
   category: Category;
   description: string;
-  photo_url?: string | null;
+  photo_urls?: string[];
   quantity?: number | null;
 }
 
@@ -44,7 +45,7 @@ export async function createDonationRequest(
       category: payload.category,
       description: payload.description,
       quantity: payload.quantity,
-      photo_url: payload.photo_url ?? null,
+      photo_urls: payload.photo_urls ?? [],
     }),
   });
 

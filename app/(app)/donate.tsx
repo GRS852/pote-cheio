@@ -22,6 +22,7 @@ import { Category, createDonationRequest } from '../../services/donationService'
 
 
 const CATEGORIES: Category[] = ['Coleiras', 'Rações', 'Higiene'];
+const MAX_PHOTOS = 5;
 
 export default function DonateScreen() {
   const router = useRouter();
@@ -31,11 +32,12 @@ export default function DonateScreen() {
   const [category, setCategory] = useState<Category>('Coleiras');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState('');
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoUris, setPhotoUris] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handlePickImage() {
+    if (photoUris.length >= MAX_PHOTOS) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { setError('Permissão para acessar a galeria foi negada.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -44,7 +46,11 @@ export default function DonateScreen() {
       aspect: [4, 3],
       quality: 0.8,
     });
-    if (!result.canceled) { setPhotoUri(result.assets[0].uri); setError(''); }
+    if (!result.canceled) { setPhotoUris(prev => [...prev, result.assets[0].uri]); setError(''); }
+  }
+
+  function handleRemoveImage(index: number) {
+    setPhotoUris(prev => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit() {
@@ -55,11 +61,11 @@ export default function DonateScreen() {
 
     setLoading(true);
     try {
-      let finalPhotoUrl: string | null = null;
+      const photoUrls: string[] = [];
 
-      if (photoUri) {
+      for (const uri of photoUris) {
         const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-        const blob = await fetch(photoUri).then(r => r.blob());
+        const blob = await fetch(uri).then(r => r.blob());
         const uploadResponse = await fetch(
           `https://oguvupgbutzkudpeurgr.supabase.co/storage/v1/object/imagens-potecheio/${fileName}`,
           {
@@ -75,14 +81,14 @@ export default function DonateScreen() {
           const err = await uploadResponse.json();
           throw new Error(err.message);
         }
-        finalPhotoUrl = `https://oguvupgbutzkudpeurgr.supabase.co/storage/v1/object/public/imagens-potecheio/${fileName}`;
+        photoUrls.push(`https://oguvupgbutzkudpeurgr.supabase.co/storage/v1/object/public/imagens-potecheio/${fileName}`);
       }
 
       await createDonationRequest(token, {
         title,
         category,
         description,
-        photo_url: finalPhotoUrl,
+        photo_urls: photoUrls,
         quantity: quantity ? Number(quantity) : null,
       });
       router.replace('/home');
@@ -108,17 +114,29 @@ export default function DonateScreen() {
         <View style={styles.contentWrapper}>
           <View style={styles.card}>
 
-            <Text style={styles.label}>Foto do item</Text>
-            <TouchableOpacity style={styles.imagePicker} onPress={handlePickImage} activeOpacity={0.8}>
-              {photoUri ? (
-                <Image source={{ uri: photoUri }} style={styles.imagePreview} resizeMode="cover" />
-              ) : (
-                <View style={styles.imagePlaceholder}>
-                  <FontAwesome name="camera" size={32} color={COLORS.textLight} />
-                  <Text style={styles.imagePlaceholderText}>Toque para adicionar uma foto</Text>
+            <Text style={styles.label}>Fotos do item ({photoUris.length}/{MAX_PHOTOS})</Text>
+            <View style={styles.photoRow}>
+              {photoUris.map((uri, index) => (
+                <View key={uri} style={styles.photoThumbWrapper}>
+                  <Image source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
+                  <TouchableOpacity
+                    style={styles.photoRemoveBtn}
+                    onPress={() => handleRemoveImage(index)}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <FontAwesome name="close" size={12} color="#FFF" />
+                  </TouchableOpacity>
                 </View>
+              ))}
+
+              {photoUris.length < MAX_PHOTOS && (
+                <TouchableOpacity style={styles.photoAddTile} onPress={handlePickImage} activeOpacity={0.8}>
+                  <FontAwesome name="camera" size={24} color={COLORS.textLight} />
+                  <Text style={styles.photoAddText}>Adicionar</Text>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+            </View>
+            <Text style={styles.photoHint}>A primeira foto é usada como capa da doação no catálogo.</Text>
 
             <Text style={styles.label}>Título do item *</Text>
             <TextInput style={styles.input} placeholder="Ex: Coleira vermelha tamanho M" placeholderTextColor={COLORS.textDark} value={title} onChangeText={setTitle} />
@@ -168,10 +186,19 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   pillText: { color: COLORS.textDark, fontWeight: '600', fontSize: 14 },
   pillTextActive: { color: '#FFF' },
-  imagePicker: { borderRadius: SIZES.radius, borderWidth: 1.5, borderColor: COLORS.border, borderStyle: 'dashed', marginBottom: 16, overflow: 'hidden' },
-  imagePlaceholder: { height: 180, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: COLORS.inputBackground },
-  imagePlaceholderText: { color: COLORS.textLight, fontSize: 14 },
-  imagePreview: { width: '100%', height: 220 },
+  photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 },
+  photoThumbWrapper: { width: 90, height: 90, borderRadius: SIZES.radius, overflow: 'hidden', position: 'relative' },
+  photoThumb: { width: '100%', height: '100%' },
+  photoRemoveBtn: {
+    position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center',
+  },
+  photoAddTile: {
+    width: 90, height: 90, borderRadius: SIZES.radius, borderWidth: 1.5, borderColor: COLORS.border,
+    borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 6, backgroundColor: COLORS.inputBackground,
+  },
+  photoAddText: { color: COLORS.textLight, fontSize: 11 },
+  photoHint: { color: COLORS.textLight, fontSize: 12, marginBottom: 16 },
   errorText: { color: '#C0392B', fontSize: 14, marginBottom: 12, textAlign: 'center' },
   requiredNote: { fontSize: 12, color: COLORS.textLight, marginBottom: 12 },
 });

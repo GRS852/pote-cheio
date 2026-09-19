@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   DimensionValue,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import {
 
 import Button from '../../components/Button';
 import ChatWidget from '../../components/ChatWidget';
+import ImageCarousel from '../../components/ImageCarousel';
 import InfoBox from '../../components/InfoBox';
 import MainHeader from '../../components/MainHeader';
 import ReportModal from '../../components/ReportModal';
@@ -120,13 +120,10 @@ export default function ProductScreen() {
         <View style={[styles.contentWrapper, { flexDirection: isDesktop ? 'row' : 'column' }]}>
 
           <View style={[styles.imageContainer, { maxWidth: imageMaxWidth }]}>
-            {donation.photo_url ? (
-              <Image source={{ uri: donation.photo_url }} style={styles.productImage} resizeMode="cover" />
-            ) : (
-              <View style={[styles.productImage, styles.imagePlaceholder]}>
-                <FontAwesome name="image" size={48} color={COLORS.textLight} />
-              </View>
-            )}
+            <ImageCarousel
+              photos={donation.photos?.length ? donation.photos : donation.photo_url ? [donation.photo_url] : []}
+              imageStyle={styles.productImage}
+            />
           </View>
 
           <View style={styles.detailsContainer}>
@@ -237,8 +234,7 @@ const styles = StyleSheet.create({
   backLinkText: { color: COLORS.primary, fontWeight: 'bold' },
   contentWrapper: { flex: 1, width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 30, gap: 40 },
   imageContainer: { flex: 1 },
-  productImage: { width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: COLORS.border },
-  imagePlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  productImage: { width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: COLORS.border, overflow: 'hidden', position: 'relative' },
   detailsContainer: { flex: 1 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 12 },
   productTitle: { flex: 1, fontSize: 28, fontWeight: 'bold', color: '#000' },
