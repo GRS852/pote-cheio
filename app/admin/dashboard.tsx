@@ -104,7 +104,7 @@ export default function AdminDashboardScreen() {
               <TouchableOpacity
                 style={styles.card}
                 activeOpacity={0.8}
-                onPress={() => router.push({ pathname: '/(admin)/report/[id]', params: { id: String(item.id) } })}
+                onPress={() => router.push({ pathname: '/admin/report/[id]', params: { id: String(item.id) } })}
               >
                 <View style={styles.cardTop}>
                   <FontAwesome

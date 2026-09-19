@@ -93,7 +93,7 @@ export default function AdminReportDetailScreen() {
           <>
             <Text style={styles.sectionLabel}>USUÁRIO DENUNCIADO</Text>
             <TouchableOpacity
-              onPress={() => router.push({ pathname: '/(admin)/user/[id]', params: { id: String(report.reported_user_id) } })}
+              onPress={() => router.push({ pathname: '/admin/user/[id]', params: { id: String(report.reported_user_id) } })}
             >
               <Text style={styles.personLink}>
                 {report.reported_user_name ?? 'Usuário'} · {report.reported_user_email} — ver perfil completo

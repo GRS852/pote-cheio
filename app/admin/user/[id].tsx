@@ -189,7 +189,7 @@ export default function AdminUserActivityScreen() {
             <TouchableOpacity
               key={r.id}
               style={styles.row}
-              onPress={() => router.push({ pathname: '/(admin)/report/[id]', params: { id: String(r.id) } })}
+              onPress={() => router.push({ pathname: '/admin/report/[id]', params: { id: String(r.id) } })}
             >
               <Text style={styles.rowTitle}>{r.reason}</Text>
               <Text style={styles.rowMeta}>{r.status}</Text>
@@ -206,7 +206,7 @@ export default function AdminUserActivityScreen() {
             <TouchableOpacity
               key={r.id}
               style={styles.row}
-              onPress={() => router.push({ pathname: '/(admin)/report/[id]', params: { id: String(r.id) } })}
+              onPress={() => router.push({ pathname: '/admin/report/[id]', params: { id: String(r.id) } })}
             >
               <Text style={styles.rowTitle}>{r.reason}</Text>
               <Text style={styles.rowMeta}>{r.status}</Text>
