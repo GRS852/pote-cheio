@@ -2,6 +2,7 @@
 
 import { Slot, useGlobalSearchParams, usePathname, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
+import { AdminAuthProvider } from '../services/AdminAuthContext';
 import { AuthProvider, useAuth } from '../services/AuthContext';
 
 // Dentro de (app), só essas telas exigem login: doar, ver o próprio perfil
@@ -29,6 +30,10 @@ function RouteGuard() {
     if (isLoading) return; // espera carregar o token
 
     const segmentList = segments as readonly string[];
+    // O painel de administrador tem seu próprio login/guarda, totalmente
+    // separado do login de usuário comum — não entra nas regras abaixo.
+    if (segmentList[0] === '(admin)') return;
+
     const inAuthGroup = segmentList[0] === '(auth)';
     const inAppGroup = segmentList[0] === '(app)';
     const needsAuth = inAppGroup && PROTECTED_APP_ROUTES.includes(segmentList[1] ?? '');
@@ -50,7 +55,9 @@ function RouteGuard() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RouteGuard />
+      <AdminAuthProvider>
+        <RouteGuard />
+      </AdminAuthProvider>
     </AuthProvider>
   );
 }

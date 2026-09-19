@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import MainHeader from '../../components/MainHeader';
+import ReportModal from '../../components/ReportModal';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import {
@@ -86,6 +87,7 @@ export default function MessagesScreen() {
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<number | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [messages, setMessages] = useState<Record<number, Message[]>>({});
   const [convLoading, setConvLoading] = useState(false);
   const [msgLoading, setMsgLoading] = useState(false);
@@ -333,6 +335,14 @@ export default function MessagesScreen() {
               <FontAwesome name="chevron-right" size={12} color={COLORS.textLight} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           )}
+
+          <TouchableOpacity
+            style={styles.reportIconBtn}
+            onPress={() => setShowReportModal(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <FontAwesome name="flag-o" size={16} color={COLORS.textLight} />
+          </TouchableOpacity>
         </View>
 
         {/* Banner de segurança */}
@@ -405,6 +415,13 @@ export default function MessagesScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <ReportModal
+          visible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="conversation"
+          targetId={activeConvId}
+        />
       </View>
     );
   };
@@ -525,6 +542,7 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   chatAreaProductTitle: { fontSize: 13, color: COLORS.textDark, fontWeight: '500', flex: 1, textAlign: 'right' },
+  reportIconBtn: { paddingLeft: 14, paddingVertical: 4 },
 
   securityBanner: {
     flexDirection: 'row',

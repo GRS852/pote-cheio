@@ -17,6 +17,7 @@ import Button from '../../components/Button';
 import ChatWidget from '../../components/ChatWidget';
 import InfoBox from '../../components/InfoBox';
 import MainHeader from '../../components/MainHeader';
+import ReportModal from '../../components/ReportModal';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import { Donation, addToWishlistRequest, getDonationRequest, removeFromWishlistRequest } from '../../services/donationService';
@@ -38,6 +39,7 @@ export default function ProductScreen() {
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -70,6 +72,15 @@ export default function ProductScreen() {
     } finally {
       setWishlistLoading(false);
     }
+  }
+
+  function handleReportPress() {
+    if (!donation) return;
+    if (!token) {
+      router.push({ pathname: '/(auth)/login', params: { redirect: `/product?id=${donation.id}` } });
+      return;
+    }
+    setShowReportModal(true);
   }
 
   const imageMaxWidth: DimensionValue = isDesktop ? '50%' : '100%';
@@ -119,7 +130,15 @@ export default function ProductScreen() {
           </View>
 
           <View style={styles.detailsContainer}>
-            <Text style={styles.productTitle}>{donation.title}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.productTitle}>{donation.title}</Text>
+              {!isOwner && (
+                <TouchableOpacity style={styles.reportLink} onPress={handleReportPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <FontAwesome name="flag-o" size={14} color={COLORS.textLight} />
+                  <Text style={styles.reportLinkText}>Denunciar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <View style={styles.categoryRow}>
               <View style={styles.categoryBadge}>
@@ -196,6 +215,13 @@ export default function ProductScreen() {
         onClose={() => setIsChatOpen(false)}
         fallbackUserName={donation.donor?.full_name}
       />
+
+      <ReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="donation"
+        targetId={donation.id}
+      />
     </View>
   );
 }
@@ -212,7 +238,10 @@ const styles = StyleSheet.create({
   productImage: { width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: COLORS.border },
   imagePlaceholder: { justifyContent: 'center', alignItems: 'center' },
   detailsContainer: { flex: 1 },
-  productTitle: { fontSize: 28, fontWeight: 'bold', color: '#000', marginBottom: 12 },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 12 },
+  productTitle: { flex: 1, fontSize: 28, fontWeight: 'bold', color: '#000' },
+  reportLink: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingTop: 6 },
+  reportLinkText: { fontSize: 13, color: COLORS.textLight, textDecorationLine: 'underline' },
   categoryRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   categoryBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: COLORS.secondary },
   categoryBadgeText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
