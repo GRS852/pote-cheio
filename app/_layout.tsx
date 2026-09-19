@@ -32,7 +32,7 @@ function RouteGuard() {
     const segmentList = segments as readonly string[];
     // O painel de administrador tem seu próprio login/guarda, totalmente
     // separado do login de usuário comum — não entra nas regras abaixo.
-    if (segmentList[0] === '(admin)') return;
+    if (segmentList[0] === 'admin') return;
 
     const inAuthGroup = segmentList[0] === '(auth)';
     const inAppGroup = segmentList[0] === '(app)';

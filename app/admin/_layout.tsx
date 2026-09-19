@@ -14,11 +14,11 @@ function AdminRouteGuard() {
     const onLoginScreen = segmentList[1] === 'login';
 
     if (!isAdminAuthenticated && !onLoginScreen) {
-      router.replace('/(admin)/login');
+      router.replace('/admin/login');
     }
 
     if (isAdminAuthenticated && onLoginScreen) {
-      router.replace('/(admin)/dashboard');
+      router.replace('/admin/dashboard');
     }
   }, [isAdminAuthenticated, isAdminLoading, segments]);
 
