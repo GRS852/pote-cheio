@@ -1,6 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS, SIZES } from '../constants/theme';
 import { useAuth } from '../services/AuthContext';
 import { CreateReportPayload, REPORT_REASONS, ReportReason, ReportTargetType, createReportRequest } from '../services/reportService';
@@ -10,9 +10,11 @@ interface ReportModalProps {
   onClose: () => void;
   targetType: ReportTargetType;
   targetId: number;
+  photoUrl?: string | null;
+  targetTitle?: string;
 }
 
-export default function ReportModal({ visible, onClose, targetType, targetId }: ReportModalProps) {
+export default function ReportModal({ visible, onClose, targetType, targetId, photoUrl, targetTitle }: ReportModalProps) {
   const { token } = useAuth();
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [description, setDescription] = useState('');
@@ -74,6 +76,19 @@ export default function ReportModal({ visible, onClose, targetType, targetId }: 
                 </TouchableOpacity>
               </View>
 
+              {targetType === 'donation' && (photoUrl || targetTitle) && (
+                <View style={styles.targetPreview}>
+                  {photoUrl ? (
+                    <Image source={{ uri: photoUrl }} style={styles.targetImage} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.targetImage, styles.targetImagePlaceholder]}>
+                      <FontAwesome name="image" size={20} color={COLORS.textLight} />
+                    </View>
+                  )}
+                  {targetTitle && <Text style={styles.targetTitle} numberOfLines={2}>{targetTitle}</Text>}
+                </View>
+              )}
+
               <Text style={styles.label}>Motivo</Text>
               {REPORT_REASONS.map(r => (
                 <TouchableOpacity
@@ -124,6 +139,10 @@ const styles = StyleSheet.create({
   box: { width: '100%', maxWidth: 420, backgroundColor: '#FFF', borderRadius: SIZES.radius, padding: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title: { fontSize: 18, fontWeight: 'bold', color: '#000' },
+  targetPreview: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14, backgroundColor: COLORS.backgroundGray, borderRadius: SIZES.radius, padding: 8 },
+  targetImage: { width: 48, height: 48, borderRadius: 8, backgroundColor: COLORS.border },
+  targetImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  targetTitle: { flex: 1, fontSize: 13, color: COLORS.textDark, fontWeight: '600' },
   label: { fontSize: 14, fontWeight: '600', color: COLORS.textDark, marginBottom: 10, marginTop: 6 },
   reasonRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
   reasonText: { fontSize: 15, color: '#000' },

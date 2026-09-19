@@ -16,9 +16,12 @@ export interface AdminReport {
   reported_user_id: number | null;
   reported_user_name: string | null;
   donation_title: string | null;
+  donation_photo_url: string | null;
   reason: string;
   description: string | null;
   status: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+  assigned_admin_id: number | null;
+  assigned_admin_name: string | null;
   created_at: string;
   resolved_at: string | null;
 }
@@ -26,8 +29,22 @@ export interface AdminReport {
 export interface AdminReportDetail extends AdminReport {
   reporter_email: string;
   reported_user_email: string | null;
+  reported_user_status?: 'active' | 'disabled';
+  banned_until?: string | null;
+  reported_user_warning_count?: number;
   donation?: Record<string, unknown> | null;
   messages?: { id: number; author_id: number; content: string; sent_at: string }[];
+}
+
+export interface AdminModerationAction {
+  id: number;
+  admin_id: number;
+  admin_name: string;
+  report_id: number | null;
+  action_type: 'warning' | 'disable_account' | 'reactivate_account';
+  ban_days: number | null;
+  reason: string | null;
+  created_at: string;
 }
 
 export interface AdminUserActivity {
@@ -36,6 +53,9 @@ export interface AdminUserActivity {
     email: string;
     avatar_url: string | null;
     created_at: string;
+    status: 'active' | 'disabled';
+    disabled_at: string | null;
+    banned_until: string | null;
     full_name: string | null;
     birth_date: string | null;
     phone: string | null;
@@ -47,6 +67,23 @@ export interface AdminUserActivity {
   conversations: Record<string, unknown>[];
   reports_made: AdminReport[];
   reports_against: AdminReport[];
+  moderation_history: AdminModerationAction[];
+  warning_count: number;
+}
+
+export interface AdminStats {
+  active_accounts: number;
+  recent_accounts: number;
+  disabled_accounts: number;
+  reports: { pending: number; reviewing: number; resolved: number; dismissed: number };
+}
+
+export interface AdminDisabledAccount {
+  id: number;
+  email: string;
+  full_name: string | null;
+  disabled_at: string;
+  days_remaining: number;
 }
 
 async function adminFetch(token: string, path: string, options: RequestInit = {}) {
@@ -103,4 +140,39 @@ export async function getAdminUserActivityRequest(token: string, id: number): Pr
 
 export async function getAdminConversationMessagesRequest(token: string, id: number) {
   return adminFetch(token, `/admin/conversations/${id}/messages`);
+}
+
+export async function getAdminStatsRequest(token: string): Promise<AdminStats> {
+  return adminFetch(token, '/admin/stats');
+}
+
+export async function getDisabledAccountsRequest(token: string): Promise<AdminDisabledAccount[]> {
+  const data = await adminFetch(token, '/admin/accounts/disabled');
+  return data.accounts;
+}
+
+export async function warnUserRequest(
+  token: string,
+  userId: number,
+  payload: { ban_days: number; reason?: string; report_id?: number }
+): Promise<{ warning_count: number }> {
+  return adminFetch(token, `/admin/users/${userId}/warn`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function disableUserRequest(
+  token: string,
+  userId: number,
+  payload: { reason?: string; report_id?: number }
+): Promise<void> {
+  await adminFetch(token, `/admin/users/${userId}/disable`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reactivateUserRequest(token: string, userId: number): Promise<void> {
+  await adminFetch(token, `/admin/users/${userId}/reactivate`, { method: 'POST' });
 }

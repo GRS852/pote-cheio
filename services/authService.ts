@@ -25,6 +25,22 @@ export class AuthError extends Error {
   }
 }
 
+export class AccountDisabledError extends Error {
+  constructor(message = 'Esta conta foi desativada.') {
+    super(message);
+    this.name = 'AccountDisabledError';
+  }
+}
+
+export class AccountBannedError extends Error {
+  bannedUntil: string;
+  constructor(bannedUntil: string) {
+    super('Esta conta está temporariamente banida.');
+    this.name = 'AccountBannedError';
+    this.bannedUntil = bannedUntil;
+  }
+}
+
 export class ConflictError extends Error {
   constructor(message = 'Email já cadastrado') {
     super(message);
@@ -51,7 +67,13 @@ export async function signInRequest(email: string, password: string) {
     throw new NetworkError();
   }
 
-  if (response.status === 401 || response.status === 403) throw new AuthError();
+  if (response.status === 403) {
+    const body = await response.json().catch(() => ({}));
+    if (body?.error === 'Account disabled') throw new AccountDisabledError();
+    if (body?.error === 'Account temporarily banned') throw new AccountBannedError(body.banned_until);
+    throw new AuthError();
+  }
+  if (response.status === 401) throw new AuthError();
   if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
 
   return response.json();
