@@ -140,6 +140,22 @@ export default function AdminReportDetailScreen() {
           </View>
         )}
 
+        {report.target_type === 'donation' && (
+          <>
+            <Text style={styles.sectionLabel}>IMAGEM DA PUBLICAÇÃO</Text>
+            {report.donation?.photo_url ? (
+              <Image source={{ uri: String(report.donation.photo_url) }} style={styles.donationImage} resizeMode="cover" />
+            ) : (
+              <View style={[styles.donationImage, styles.donationImagePlaceholder]}>
+                <FontAwesome name="image" size={28} color={COLORS.textLight} />
+                <Text style={styles.donationImagePlaceholderText}>
+                  {report.donation ? 'Esta publicação não tem imagem cadastrada' : 'Publicação removida — imagem não disponível'}
+                </Text>
+              </View>
+            )}
+          </>
+        )}
+
         {report.description ? (
           <>
             <Text style={styles.sectionLabel}>DESCRIÇÃO DO DENUNCIANTE</Text>
@@ -178,9 +194,6 @@ export default function AdminReportDetailScreen() {
         {report.donation && (
           <>
             <Text style={styles.sectionLabel}>PUBLICAÇÃO DENUNCIADA</Text>
-            {!!report.donation.photo_url && (
-              <Image source={{ uri: String(report.donation.photo_url) }} style={styles.donationImage} resizeMode="cover" />
-            )}
             <Text style={styles.personText}>{String(report.donation.title)}</Text>
             <Text style={styles.descriptionMuted}>{String(report.donation.description ?? '')}</Text>
           </>
@@ -281,6 +294,8 @@ const styles = StyleSheet.create({
   warningText: { fontSize: 13, color: COLORS.textDark, marginTop: 6 },
   warningTextDanger: { fontSize: 13, color: '#C0392B', fontWeight: '700', marginTop: 6 },
   donationImage: { width: '100%', height: 220, borderRadius: SIZES.radius, marginBottom: 10, backgroundColor: COLORS.border },
+  donationImagePlaceholder: { alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed' },
+  donationImagePlaceholderText: { fontSize: 13, color: COLORS.textLight, textAlign: 'center', paddingHorizontal: 20 },
   messageRow: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   messageAuthor: { fontSize: 11, color: COLORS.textLight, marginBottom: 2 },
   messageContent: { fontSize: 14, color: '#000' },
