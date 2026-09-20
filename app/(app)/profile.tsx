@@ -5,7 +5,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import InterestedUsersModal from '../../components/InterestedUsersModal';
 import MainHeader from '../../components/MainHeader';
 import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
 import ProfileUserInfo from '../../components/ProfileUserInfo';
@@ -21,15 +21,20 @@ import { useAuth } from '../../services/AuthContext';
 import { updateProfileRequest } from '../../services/authService';
 import {
   Donation,
-  DonationStatus,
   InterestedUser,
   confirmDonationRequest,
   deleteDonationRequest,
   getInterestedUsersRequest,
   getMyDonationsRequest,
   getWishlistRequest,
-  updateDonationStatusRequest,
+  reserveDonationRequest,
+  unreserveDonationRequest,
 } from '../../services/donationService';
+
+function daysUntil(dateStr: string): number {
+  const diffMs = new Date(dateStr).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+}
 
 type TabType = 'Minhas doações' | 'Historia' | 'Favoritos';
 const TABS: TabType[] = ['Minhas doações', 'Historia', 'Favoritos'];
@@ -52,10 +57,13 @@ export default function ProfileScreen() {
 
   const [avatarLoading, setAvatarLoading] = useState(false);
 
-  // Confirm donation modal
-  const [confirmModalDonationId, setConfirmModalDonationId] = useState<number | null>(null);
+  // Modal de interessados (usado tanto por "Reservar" quanto por "Concluir")
+  const [modalDonationId, setModalDonationId] = useState<number | null>(null);
+  const [modalMode, setModalMode] = useState<'reserve' | 'confirm' | null>(null);
   const [interestedUsers, setInterestedUsers] = useState<InterestedUser[]>([]);
   const [interestedLoading, setInterestedLoading] = useState(false);
+  const [selectingUserId, setSelectingUserId] = useState<number | null>(null);
+  const [unreserveLoadingId, setUnreserveLoadingId] = useState<number | null>(null);
 
   const { signOut, user, token, updateUserLocally } = useAuth();
 
@@ -131,14 +139,17 @@ export default function ProfileScreen() {
     await signOut();
   }
 
-  async function handleStatusChange(donationId: number, status: DonationStatus) {
+  async function handleUnreserve(donationId: number) {
     if (!token) return;
     setActionError('');
+    setUnreserveLoadingId(donationId);
     try {
-      const updated = await updateDonationStatusRequest(token, donationId, status);
-      setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: updated.status } : d));
+      const updated = await unreserveDonationRequest(token, donationId);
+      setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, ...updated } : d));
     } catch {
-      setActionError('Não foi possível atualizar o status.');
+      setActionError('Não foi possível desreservar a doação.');
+    } finally {
+      setUnreserveLoadingId(null);
     }
   }
 
@@ -153,9 +164,10 @@ export default function ProfileScreen() {
     }
   }
 
-  async function handleOpenConfirmModal(donationId: number) {
+  async function handleOpenInterestedModal(donationId: number, mode: 'reserve' | 'confirm') {
     if (!token) return;
-    setConfirmModalDonationId(donationId);
+    setModalDonationId(donationId);
+    setModalMode(mode);
     setInterestedLoading(true);
     try {
       const users = await getInterestedUsersRequest(token, donationId);
@@ -167,15 +179,30 @@ export default function ProfileScreen() {
     }
   }
 
-  async function handleConfirmToUser(donationId: number, userId: number) {
-    if (!token) return;
+  function handleCloseInterestedModal() {
+    setModalDonationId(null);
+    setModalMode(null);
+  }
+
+  async function handleSelectInterestedUser(userId: number) {
+    if (!token || !modalDonationId || !modalMode) return;
+    const donationId = modalDonationId;
+    setSelectingUserId(userId);
     try {
-      const { donation } = await confirmDonationRequest(token, donationId, userId);
-      setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: donation.status } : d));
-      setConfirmModalDonationId(null);
-      router.push({ pathname: '/transaction', params: { id: String(donationId) } });
-    } catch {
-      setActionError('Não foi possível confirmar a doação.');
+      if (modalMode === 'confirm') {
+        const { donation } = await confirmDonationRequest(token, donationId, userId);
+        setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: donation.status } : d));
+        handleCloseInterestedModal();
+        router.push({ pathname: '/transaction', params: { id: String(donationId) } });
+      } else {
+        const updated = await reserveDonationRequest(token, donationId, userId);
+        setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, ...updated } : d));
+        handleCloseInterestedModal();
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Não foi possível concluir a ação.');
+    } finally {
+      setSelectingUserId(null);
     }
   }
 
@@ -188,47 +215,20 @@ export default function ProfileScreen() {
     <View style={styles.mainContainer}>
       <MainHeader showSearch={false} />
 
-      {/* Modal: escolher usuário para confirmar doação */}
-      <Modal
-        visible={confirmModalDonationId != null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setConfirmModalDonationId(null)}
-      >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setConfirmModalDonationId(null)}>
-          <TouchableOpacity style={styles.confirmModalBox} activeOpacity={1} onPress={() => {}}>
-            <Text style={styles.confirmModalTitle}>Concluir para quem?</Text>
-            <Text style={styles.confirmModalSubtitle}>Selecione o usuário que receberá a doação</Text>
-
-            {interestedLoading ? (
-              <ActivityIndicator color={COLORS.primary} style={{ padding: 20 }} />
-            ) : interestedUsers.length === 0 ? (
-              <Text style={styles.confirmModalEmpty}>Nenhum usuário demonstrou interesse ainda.</Text>
-            ) : (
-              <ScrollView style={{ maxHeight: 280 }}>
-                {interestedUsers.map(u => (
-                  <TouchableOpacity
-                    key={u.user_id}
-                    style={styles.interestedUserItem}
-                    onPress={() => handleConfirmToUser(confirmModalDonationId!, u.user_id)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.interestedAvatar}>
-                      <Text style={styles.interestedAvatarText}>{u.full_name.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.interestedUserName}>{u.full_name}</Text>
-                    <FontAwesome name="check-circle" size={18} color={COLORS.primary} />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-
-            <TouchableOpacity style={styles.confirmModalClose} onPress={() => setConfirmModalDonationId(null)}>
-              <Text style={styles.confirmModalCloseText}>Cancelar</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+      <InterestedUsersModal
+        visible={modalDonationId != null}
+        onClose={handleCloseInterestedModal}
+        title={modalMode === 'reserve' ? 'Reservar para quem?' : 'Concluir para quem?'}
+        subtitle={
+          modalMode === 'reserve'
+            ? 'Selecione o interessado para reservar o item por 3 dias'
+            : 'Selecione o usuário que receberá a doação'
+        }
+        users={interestedUsers}
+        loading={interestedLoading}
+        onSelect={handleSelectInterestedUser}
+        selectingUserId={selectingUserId}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.contentWrapper}>
@@ -298,18 +298,39 @@ export default function ProfileScreen() {
                         </View>
                       </View>
 
+                      {d.status === 'reserved' && d.reserved_for_user_id && (
+                        <Text style={styles.reservedForText}>
+                          Reservado para {d.reserved_for_name ?? 'alguém'}
+                          {d.reserved_until ? ` · expira em ${daysUntil(d.reserved_until)} dia(s)` : ''}
+                        </Text>
+                      )}
+
                       <View style={styles.donationActions}>
                         {d.status === 'available' && (
-                          <TouchableOpacity style={styles.actionChip} onPress={() => handleStatusChange(d.id, 'reserved')} activeOpacity={0.7}>
+                          <TouchableOpacity style={styles.actionChip} onPress={() => handleOpenInterestedModal(d.id, 'reserve')} activeOpacity={0.7}>
                             <Text style={styles.actionChipText}>Reservar</Text>
                           </TouchableOpacity>
                         )}
-                        {d.status === 'available' && (
-                          <TouchableOpacity style={[styles.actionChip, styles.actionChipGreen]} onPress={() => handleOpenConfirmModal(d.id)} activeOpacity={0.7}>
+                        {(d.status === 'available' || (d.status === 'reserved' && d.reserved_for_user_id)) && (
+                          <TouchableOpacity style={[styles.actionChip, styles.actionChipGreen]} onPress={() => handleOpenInterestedModal(d.id, 'confirm')} activeOpacity={0.7}>
                             <Text style={[styles.actionChipText, styles.actionChipTextGreen]}>Concluir</Text>
                           </TouchableOpacity>
                         )}
-                        {(d.status === 'reserved' || d.status === 'completed') && (
+                        {d.status === 'reserved' && d.reserved_for_user_id && (
+                          <TouchableOpacity
+                            style={[styles.actionChip, styles.actionChipDanger]}
+                            onPress={() => handleUnreserve(d.id)}
+                            activeOpacity={0.7}
+                            disabled={unreserveLoadingId === d.id}
+                          >
+                            {unreserveLoadingId === d.id ? (
+                              <ActivityIndicator size="small" color="#C0392B" />
+                            ) : (
+                              <Text style={[styles.actionChipText, { color: '#C0392B' }]}>Desreservar</Text>
+                            )}
+                          </TouchableOpacity>
+                        )}
+                        {((d.status === 'reserved' && !d.reserved_for_user_id) || d.status === 'completed') && (
                           <TouchableOpacity
                             style={[styles.actionChip, styles.actionChipGreen]}
                             onPress={() => router.push({ pathname: '/transaction', params: { id: String(d.id) } })}
@@ -523,18 +544,7 @@ const styles = StyleSheet.create({
   logoutConfirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#C0392B', alignItems: 'center' },
   logoutConfirmBtnText: { fontSize: 15, color: '#FFF', fontWeight: '600' },
 
-  // Confirm donation modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  confirmModalBox: { backgroundColor: '#FFF', borderRadius: 20, padding: 24, width: '100%', maxWidth: 400, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 12 },
-  confirmModalTitle: { fontSize: 20, fontWeight: 'bold', color: '#000', marginBottom: 4, textAlign: 'center' },
-  confirmModalSubtitle: { fontSize: 14, color: COLORS.textDark, textAlign: 'center', marginBottom: 20 },
-  confirmModalEmpty: { fontSize: 14, color: COLORS.textLight, textAlign: 'center', paddingVertical: 20 },
-  interestedUserItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: COLORS.border, gap: 12 },
-  interestedAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.secondary, justifyContent: 'center', alignItems: 'center' },
-  interestedAvatarText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  interestedUserName: { flex: 1, fontSize: 15, fontWeight: '600', color: '#000' },
-  confirmModalClose: { marginTop: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
-  confirmModalCloseText: { fontSize: 15, color: COLORS.textDark, fontWeight: '600' },
+  reservedForText: { fontSize: 12, color: COLORS.textLight, marginTop: -4, marginBottom: 10 },
 
   // History tab
   historySection: { fontSize: 15, fontWeight: 'bold', color: '#000', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
