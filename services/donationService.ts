@@ -15,6 +15,9 @@ export interface Donation {
   in_wishlist: boolean;
   donor_id: number;
   created_at: string;
+  reserved_for_user_id?: number | null;
+  reserved_for_name?: string | null;
+  reserved_until?: string | null;
   donor?: {
     id: number;
     full_name: string;
@@ -134,6 +137,7 @@ export async function deleteDonationRequest(token: string, donationId: number): 
 export interface InterestedUser {
   user_id: number;
   full_name: string;
+  avatar_url: string | null;
   conversation_id: number;
 }
 
@@ -158,4 +162,32 @@ export async function confirmDonationRequest(
   });
   if (!response.ok) throw new Error('Erro ao confirmar doação');
   return response.json();
+}
+
+export async function reserveDonationRequest(
+  token: string,
+  donationId: number,
+  userId: number
+): Promise<Donation> {
+  const response = await fetch(`${API_URL}/donations/${donationId}/reserve`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.message ?? err?.error ?? 'Erro ao reservar doação');
+  }
+  const data = await response.json();
+  return data.donation;
+}
+
+export async function unreserveDonationRequest(token: string, donationId: number): Promise<Donation> {
+  const response = await fetch(`${API_URL}/donations/${donationId}/unreserve`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Erro ao desreservar doação');
+  const data = await response.json();
+  return data.donation;
 }
