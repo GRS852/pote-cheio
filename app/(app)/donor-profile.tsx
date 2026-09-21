@@ -96,8 +96,9 @@ export default function DonorProfileScreen() {
               />
 
               <ProfileImpactMetrics
-                totalDonatedValue=""
                 itemsDonatedCount={0}
+                itemsReceivedCount={0}
+                itemsReservedCount={0}
               />
 
               <View style={styles.ratingSummaryRow}>

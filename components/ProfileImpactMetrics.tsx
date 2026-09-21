@@ -4,23 +4,15 @@ import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { COLORS } from '../constants/theme';
 
 export interface ProfileImpactMetricsProps {
-  totalDonatedValue: string;
   itemsDonatedCount: number;
-}
-
-function ComingSoonOverlay() {
-  return (
-    <View style={styles.comingSoonOverlay} pointerEvents="none">
-      <View style={styles.comingSoonBadge}>
-        <Text style={styles.comingSoonText}>EM BREVE</Text>
-      </View>
-    </View>
-  );
+  itemsReceivedCount: number;
+  itemsReservedCount: number;
 }
 
 export default function ProfileImpactMetrics({
-  totalDonatedValue,
   itemsDonatedCount,
+  itemsReceivedCount,
+  itemsReservedCount,
 }: ProfileImpactMetricsProps) {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
@@ -28,24 +20,30 @@ export default function ProfileImpactMetrics({
   return (
     <View style={[styles.card, { flexDirection: isDesktop ? 'row' : 'column' }]}>
 
-      {/* Total doado — EM BREVE */}
-      <View style={styles.column}>
-        <MaterialCommunityIcons name="hand-heart-outline" size={48} color={COLORS.primary} style={styles.icon} />
-        <View>
-          <Text style={styles.title}>Total doado</Text>
-          <Text style={[styles.value, { color: COLORS.primary }]}>{totalDonatedValue}</Text>
-          <Text style={styles.subtitle}>valor aproximado</Text>
-        </View>
-        <ComingSoonOverlay />
-      </View>
-
-      {/* Itens doados — dado real */}
       <View style={styles.column}>
         <MaterialCommunityIcons name="package-variant-closed" size={48} color={COLORS.secondary} style={styles.icon} />
         <View>
           <Text style={styles.title}>Itens doados</Text>
           <Text style={[styles.value, { color: COLORS.secondary }]}>{itemsDonatedCount}</Text>
-          <Text style={styles.subtitle}>itens concluídos</Text>
+          <Text style={styles.subtitle}>doações concluídas</Text>
+        </View>
+      </View>
+
+      <View style={styles.column}>
+        <MaterialCommunityIcons name="gift-outline" size={48} color={COLORS.primary} style={styles.icon} />
+        <View>
+          <Text style={styles.title}>Recebidos</Text>
+          <Text style={[styles.value, { color: COLORS.primary }]}>{itemsReceivedCount}</Text>
+          <Text style={styles.subtitle}>itens recebidos</Text>
+        </View>
+      </View>
+
+      <View style={styles.column}>
+        <MaterialCommunityIcons name="clock-outline" size={48} color={COLORS.textDark} style={styles.icon} />
+        <View>
+          <Text style={styles.title}>Reservados</Text>
+          <Text style={[styles.value, { color: COLORS.textDark }]}>{itemsReservedCount}</Text>
+          <Text style={styles.subtitle}>itens que você reservou</Text>
         </View>
       </View>
 
@@ -68,32 +66,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    position: 'relative',
   },
   icon: { marginRight: 16 },
   title: { fontSize: 16, color: '#000' },
   subtitle: { fontSize: 14, color: '#000' },
   value: { fontSize: 28, fontWeight: 'bold' },
-
-  comingSoonOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  comingSoonBadge: {
-    backgroundColor: '#EAEAEA',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  comingSoonText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: COLORS.textDark,
-    letterSpacing: 1,
-  },
 });

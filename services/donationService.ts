@@ -14,15 +14,12 @@ export interface Donation {
   status: DonationStatus;
   in_wishlist: boolean;
   donor_id: number;
+  donor_name: string;
+  donor_created_at: string;
   created_at: string;
   reserved_for_user_id?: number | null;
   reserved_for_name?: string | null;
   reserved_until?: string | null;
-  donor?: {
-    id: number;
-    full_name: string;
-    created_at: string;
-  };
 }
 
 export interface CreateDonationPayload {
