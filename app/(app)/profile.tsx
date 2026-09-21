@@ -69,6 +69,8 @@ export default function ProfileScreen() {
 
   const memberSince = user?.created_at ? new Date(user.created_at).getFullYear().toString() : '';
   const completedCount = myDonations.filter(d => d.status === 'completed').length;
+  const reservedCount = myDonations.filter(d => d.status === 'reserved').length;
+  const receivedCount = wishlist.filter(d => d.status === 'completed').length;
 
   // Load on mount — used in impact metrics, Minhas doações and História
   useEffect(() => {
@@ -80,16 +82,16 @@ export default function ProfileScreen() {
       .finally(() => setDonationsLoading(false));
   }, [token]);
 
-  // Load wishlist for Favoritos and História tabs
+  // Carrega logo na entrada da tela — "Recebidos" no topo do perfil já
+  // depende disso, não só as abas Favoritos/História.
   useEffect(() => {
-    if ((activeTab !== 'Favoritos' && activeTab !== 'Historia') || !token) return;
-    if (wishlist.length > 0) return;
+    if (!token) return;
     setWishlistLoading(true);
     getWishlistRequest(token)
       .then(setWishlist)
       .catch(() => setWishlist([]))
       .finally(() => setWishlistLoading(false));
-  }, [activeTab, token]);
+  }, [token]);
 
   async function handleAvatarChange() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -248,8 +250,9 @@ export default function ProfileScreen() {
           />
 
           <ProfileImpactMetrics
-            totalDonatedValue="R$0,00"
             itemsDonatedCount={completedCount}
+            itemsReceivedCount={receivedCount}
+            itemsReservedCount={reservedCount}
           />
 
           <View style={styles.tabsContainer}>

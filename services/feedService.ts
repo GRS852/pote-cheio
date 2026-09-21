@@ -10,11 +10,8 @@ export interface FeedDonation {
   status: 'available' | 'reserved' | 'completed';
   in_wishlist: boolean;
   donor_id: number;
+  donor_name: string;
   created_at: string;
-  donor?: {
-    id: number;
-    full_name: string;
-  };
 }
 
 export interface FeedResponse {

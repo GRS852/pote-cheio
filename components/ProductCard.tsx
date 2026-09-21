@@ -11,9 +11,10 @@ export interface ProductCardProps {
   location?: string;
   in_wishlist?: boolean;
   isOwn?: boolean;
+  donorName?: string;
 }
 
-export default function ProductCard({ title, category, imageUrl, onPress, location, in_wishlist, isOwn }: ProductCardProps) {
+export default function ProductCard({ title, category, imageUrl, onPress, location, in_wishlist, isOwn, donorName }: ProductCardProps) {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
       <View style={styles.imageWrapper}>
@@ -38,6 +39,12 @@ export default function ProductCard({ title, category, imageUrl, onPress, locati
 
       <View style={styles.infoContainer}>
         <Text style={styles.title} numberOfLines={2}>{title}</Text>
+        {donorName && (
+          <View style={styles.donorRow}>
+            <FontAwesome name="user-circle-o" size={11} color={COLORS.textLight} />
+            <Text style={styles.donorText} numberOfLines={1}>{donorName}</Text>
+          </View>
+        )}
 
         <View style={styles.footer}>
           {location ? (
@@ -67,7 +74,9 @@ const styles = StyleSheet.create({
   ownBadge: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: COLORS.primary },
   ownBadgeText: { fontSize: 9, fontWeight: 'bold', color: '#FFF', letterSpacing: 0.3 },
   infoContainer: { padding: 12 },
-  title: { fontSize: 14, fontWeight: 'bold', color: '#000', marginBottom: 10, minHeight: 34 },
+  title: { fontSize: 14, fontWeight: 'bold', color: '#000', marginBottom: 4, minHeight: 34 },
+  donorRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 },
+  donorText: { fontSize: 11, color: COLORS.textLight, flex: 1 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   locationContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 5 },
   locationText: { fontSize: 12, color: COLORS.textLight, marginLeft: 4 },

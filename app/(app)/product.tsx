@@ -179,7 +179,7 @@ export default function ProductScreen() {
               </View>
             )}
 
-            {donation.donor && (
+            {donation.donor_name && (
               <>
                 <SectionTitle title="DOADOR" />
                 <TouchableOpacity
@@ -187,16 +187,16 @@ export default function ProductScreen() {
                   activeOpacity={0.8}
                   onPress={() => router.push({
                     pathname: '/donor-profile',
-                    params: { id: String(donation.donor!.id), name: donation.donor!.full_name },
+                    params: { id: String(donation.donor_id), name: donation.donor_name },
                   })}
                 >
                   <View style={styles.donorAvatar}>
-                    <Text style={styles.donorAvatarLetter}>{donation.donor.full_name[0]}</Text>
+                    <Text style={styles.donorAvatarLetter}>{donation.donor_name[0]}</Text>
                   </View>
                   <View style={styles.donorInfo}>
-                    <Text style={styles.donorName}>{donation.donor.full_name}</Text>
+                    <Text style={styles.donorName}>{donation.donor_name}</Text>
                     <Text style={styles.donorSince}>
-                      Membro desde {new Date(donation.donor.created_at).getFullYear()}
+                      Membro desde {new Date(donation.donor_created_at).getFullYear()}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -210,7 +210,7 @@ export default function ProductScreen() {
         forceOpenConversationId={conversationId}
         forceOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
-        fallbackUserName={donation.donor?.full_name}
+        fallbackUserName={donation.donor_name}
       />
 
       <ReportModal
