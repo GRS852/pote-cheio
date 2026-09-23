@@ -2,6 +2,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import { Link } from 'expo-router';
+import Head from 'expo-router/head';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -118,6 +119,7 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.mainContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <Head><title>Entrar | Pote Cheio</title></Head>
       <AuthHeader activeTab="Entrar" />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
@@ -129,10 +131,7 @@ export default function LoginScreen() {
             </View>
           )}
           <View style={styles.formContainer}>
-            <View style={styles.titleRow}>
-              <Text style={styles.title}>Bem-vindo de volta</Text>
-              <Image source={require('../../assets/images/emoji.png')} style={styles.emoji} />
-            </View>
+            <Text style={styles.title}>Bem-vindo de volta</Text>
             <Text style={styles.subtitle}>Entre na sua conta e continue fazendo a diferença!</Text>
 
             <Input label="Email" placeholder="seu@email.com" value={form.email} onChangeText={(text) => handleChange('email', text)} />
@@ -214,9 +213,7 @@ const styles = StyleSheet.create({
   bannerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   mainLogo: { width: '100%', maxWidth: 400, height: 400 },
   formContainer: { flex: 1, width: '100%', maxWidth: 450, justifyContent: 'center' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#000' },
-  emoji: { width: 28, height: 28, marginLeft: 8 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#000', marginBottom: 8 },
   subtitle: { fontSize: 16, color: COLORS.textDark, marginBottom: 24 },
   forgotPasswordContainer: { alignItems: 'flex-end', marginBottom: 20 },
   forgotPasswordText: { color: '#000', fontSize: 14 },

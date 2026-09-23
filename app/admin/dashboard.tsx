@@ -1,5 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -73,6 +74,7 @@ export default function AdminDashboardScreen() {
 
   return (
     <View style={styles.container}>
+      <Head><title>Painel administrativo | Pote Cheio</title></Head>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <FontAwesome name="shield" size={18} color={COLORS.primary} />

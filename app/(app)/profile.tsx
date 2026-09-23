@@ -1,6 +1,7 @@
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
 
   const [myDonations, setMyDonations] = useState<Donation[]>([]);
   const [donationsLoading, setDonationsLoading] = useState(false);
+  const [donationsError, setDonationsError] = useState('');
   const [actionError, setActionError] = useState('');
 
   const [wishlist, setWishlist] = useState<Donation[]>([]);
@@ -76,9 +78,13 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!token) return;
     setDonationsLoading(true);
+    setDonationsError('');
     getMyDonationsRequest(token)
       .then(setMyDonations)
-      .catch(() => setMyDonations([]))
+      .catch(err => {
+        setMyDonations([]);
+        setDonationsError(err instanceof Error ? err.message : 'Não foi possível carregar suas doações.');
+      })
       .finally(() => setDonationsLoading(false));
   }, [token]);
 
@@ -215,6 +221,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.mainContainer}>
+      <Head><title>Meu perfil | Pote Cheio</title></Head>
       <MainHeader showSearch={false} />
 
       <InterestedUsersModal
@@ -273,6 +280,10 @@ export default function ProfileScreen() {
             {activeTab === 'Minhas doações' && (
               donationsLoading ? (
                 <ActivityIndicator color={COLORS.primary} style={{ padding: 30 }} />
+              ) : donationsError ? (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyStateText, { color: '#C0392B' }]}>{donationsError}</Text>
+                </View>
               ) : myDonations.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyStateText}>Você ainda não publicou nenhuma doação.</Text>
@@ -300,6 +311,19 @@ export default function ProfileScreen() {
                           </Text>
                         </View>
                       </View>
+
+                      {d.status === 'available' && !!d.interested_count && d.interested_count > 0 && (
+                        <TouchableOpacity
+                          style={styles.interestedBadge}
+                          onPress={() => handleOpenInterestedModal(d.id, 'reserve')}
+                          activeOpacity={0.7}
+                        >
+                          <FontAwesome name="heart" size={12} color={COLORS.secondary} />
+                          <Text style={styles.interestedBadgeText}>
+                            {d.interested_count} pessoa{d.interested_count === 1 ? '' : 's'} interessada{d.interested_count === 1 ? '' : 's'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
 
                       {d.status === 'reserved' && d.reserved_for_user_id && (
                         <Text style={styles.reservedForText}>
@@ -548,6 +572,8 @@ const styles = StyleSheet.create({
   logoutConfirmBtnText: { fontSize: 15, color: '#FFF', fontWeight: '600' },
 
   reservedForText: { fontSize: 12, color: COLORS.textLight, marginTop: -4, marginBottom: 10 },
+  interestedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: 'rgba(254,108,0,0.1)' },
+  interestedBadgeText: { fontSize: 12, fontWeight: '600', color: COLORS.secondary },
 
   // History tab
   historySection: { fontSize: 15, fontWeight: 'bold', color: '#000', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },

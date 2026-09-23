@@ -1,5 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -63,6 +64,7 @@ export default function TransactionScreen() {
   if (loading) {
     return (
       <View style={styles.mainContainer}>
+        <Head><title>Pote Cheio</title></Head>
         <MainHeader showSearch={false} />
         <View style={styles.centerContainer}><ActivityIndicator size="large" color={COLORS.primary} /></View>
       </View>
@@ -72,6 +74,7 @@ export default function TransactionScreen() {
   if (error || !transaction) {
     return (
       <View style={styles.mainContainer}>
+        <Head><title>Pote Cheio</title></Head>
         <MainHeader showSearch={false} />
         <View style={styles.centerContainer}>
           <Text style={styles.errorText}>{error || 'Essa doação ainda não tem um pedido aceito.'}</Text>
@@ -102,6 +105,7 @@ export default function TransactionScreen() {
 
   return (
     <View style={styles.mainContainer}>
+      <Head><title>Acompanhar doação | Pote Cheio</title></Head>
       <MainHeader showSearch={false} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>

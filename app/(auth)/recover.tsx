@@ -1,4 +1,5 @@
 import { Link, useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'react-native';
@@ -92,6 +93,7 @@ export default function RecoverScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.mainContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <Head><title>Recuperar senha | Pote Cheio</title></Head>
       <AuthHeader />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">

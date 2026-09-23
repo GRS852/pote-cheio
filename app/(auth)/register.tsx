@@ -1,4 +1,5 @@
 import { Link } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -38,6 +39,7 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.mainContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <Head><title>Criar conta | Pote Cheio</title></Head>
       <AuthHeader activeTab="Cadastrar" />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">

@@ -1,4 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons';
+import Head from 'expo-router/head';
 import React, { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 
@@ -32,6 +33,7 @@ export default function AdminLoginScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <Head><title>Login administrativo | Pote Cheio</title></Head>
       <View style={styles.box}>
         <View style={styles.logoRow}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
