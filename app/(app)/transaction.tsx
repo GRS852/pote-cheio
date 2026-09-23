@@ -153,18 +153,25 @@ export default function TransactionScreen() {
             {!isFinalized && transaction.status === 'accepted_awaiting_shipment' && (
               isDonor ? (
                 <View style={styles.actionBox}>
-                  <Text style={styles.actionText}>Combine a entrega com o beneficiário pelo chat e, quando enviar o item, marque abaixo.</Text>
+                  <Text style={styles.actionText}>Combine a entrega com o beneficiário pelo chat. Quando entregar o item, finalize a doação.</Text>
                   <TouchableOpacity
                     style={styles.primaryBtn}
+                    onPress={() => runAction(() => donorConfirmReceivedRequest(token!, transaction.donation_id))}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>Finalizar doação</Text>}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.secondaryBtn}
                     onPress={() => runAction(() => shipTransactionRequest(token!, transaction.donation_id))}
                     disabled={actionLoading}
                   >
-                    {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>Marquei como enviado</Text>}
+                    <Text style={styles.secondaryBtnText}>Vou enviar por correio/entrega (acompanhar envio)</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <View style={styles.actionBox}>
-                  <Text style={styles.actionText}>Aguardando o doador enviar o item. Combine os detalhes pelo chat.</Text>
+                  <Text style={styles.actionText}>Aguardando o doador confirmar a entrega. Combine os detalhes pelo chat.</Text>
                 </View>
               )
             )}

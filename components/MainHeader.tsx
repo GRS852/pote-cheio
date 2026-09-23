@@ -246,7 +246,11 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
           onPress={() => setShowUserMenu(false)}
         >
           <TouchableOpacity style={styles.userMenuPanel} activeOpacity={1} onPress={() => {}}>
-            <View style={styles.userMenuTop}>
+            <TouchableOpacity
+              style={styles.userMenuTop}
+              onPress={() => { setShowUserMenu(false); router.push('/(app)/profile'); }}
+              activeOpacity={0.7}
+            >
               <View style={styles.userMenuAvatarCircle}>
                 {user?.avatar_url ? (
                   <Image source={{ uri: user.avatar_url }} style={styles.userMenuAvatarImage} resizeMode="cover" />
@@ -255,7 +259,7 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
                 )}
               </View>
               <Text style={styles.userMenuName} numberOfLines={1}>{user?.full_name ?? 'Usuário'}</Text>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.userMenuDivider} />
 

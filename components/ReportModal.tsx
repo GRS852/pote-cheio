@@ -43,7 +43,11 @@ export default function ReportModal({ visible, onClose, targetType, targetId, ph
         target_type: targetType,
         reason,
         description: description.trim() || undefined,
-        ...(targetType === 'donation' ? { donation_id: targetId } : { conversation_id: targetId }),
+        ...(targetType === 'donation'
+          ? { donation_id: targetId }
+          : targetType === 'comment'
+          ? { comment_id: targetId }
+          : { conversation_id: targetId }),
       };
       await createReportRequest(token, payload);
       setSent(true);
@@ -70,7 +74,9 @@ export default function ReportModal({ visible, onClose, targetType, targetId, ph
           ) : (
             <>
               <View style={styles.header}>
-                <Text style={styles.title}>Denunciar {targetType === 'donation' ? 'publicação' : 'conversa'}</Text>
+                <Text style={styles.title}>
+                  Denunciar {targetType === 'donation' ? 'publicação' : targetType === 'comment' ? 'comentário' : 'conversa'}
+                </Text>
                 <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <FontAwesome name="close" size={20} color={COLORS.textDark} />
                 </TouchableOpacity>

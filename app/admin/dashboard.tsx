@@ -7,7 +7,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View }
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAdminAuth } from '../../services/AdminAuthContext';
 import { AdminReport, AdminStats, getAdminReportsRequest, getAdminStatsRequest } from '../../services/adminService';
-import { REPORT_REASONS } from '../../services/reportService';
+import { REPORT_REASONS, REPORT_TARGET_ICONS, REPORT_TARGET_LABELS } from '../../services/reportService';
 
 type StatusFilter = 'pending' | 'reviewing' | 'resolved' | 'dismissed' | 'all';
 
@@ -156,12 +156,12 @@ export default function AdminDashboardScreen() {
                 <View style={styles.cardTop}>
                   <View style={styles.typeTag}>
                     <FontAwesome
-                      name={item.target_type === 'donation' ? 'file-text-o' : 'comment-o'}
+                      name={REPORT_TARGET_ICONS[item.target_type] as any}
                       size={11}
                       color="#FFF"
                     />
                     <Text style={styles.typeTagText}>
-                      {item.target_type === 'donation' ? 'Denúncia de Post' : 'Denúncia de Chat'}
+                      {REPORT_TARGET_LABELS[item.target_type]}
                     </Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -170,7 +170,11 @@ export default function AdminDashboardScreen() {
                 </View>
                 <Text style={styles.cardReason}>{reasonLabel(item.reason)}</Text>
                 <Text style={styles.cardDetail}>
-                  {item.target_type === 'donation' ? item.donation_title ?? 'Publicação' : 'Conversa'} · denunciado por{' '}
+                  {item.target_type === 'donation'
+                    ? item.donation_title ?? 'Publicação'
+                    : item.target_type === 'comment'
+                    ? `Comentário sobre "${item.donation_title ?? 'doação'}"`
+                    : 'Conversa'} · denunciado por{' '}
                   <Text style={styles.bold}>{item.reporter_name ?? 'Usuário'}</Text>
                   {item.reported_user_name ? (
                     <>

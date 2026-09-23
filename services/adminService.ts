@@ -10,13 +10,15 @@ export interface AdminReport {
   id: number;
   reporter_id: number;
   reporter_name: string | null;
-  target_type: 'donation' | 'conversation';
+  target_type: 'donation' | 'conversation' | 'comment';
   donation_id: number | null;
   conversation_id: number | null;
+  comment_id: number | null;
   reported_user_id: number | null;
   reported_user_name: string | null;
   donation_title: string | null;
   donation_photo_url: string | null;
+  comment_text: string | null;
   reason: string;
   description: string | null;
   status: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
@@ -34,6 +36,7 @@ export interface AdminReportDetail extends AdminReport {
   reported_user_warning_count?: number;
   donation?: Record<string, unknown> | null;
   messages?: { id: number; author_id: number; content: string; sent_at: string }[];
+  comment?: { id: number; comment: string; donation_title: string } | null;
 }
 
 export interface AdminModerationAction {

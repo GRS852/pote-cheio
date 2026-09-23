@@ -17,7 +17,9 @@ import InterestedUsersModal from '../../components/InterestedUsersModal';
 import MainHeader from '../../components/MainHeader';
 import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
 import ProfileUserInfo from '../../components/ProfileUserInfo';
-import { COLORS } from '../../constants/theme';
+import RatingStars from '../../components/RatingStars';
+import ReportModal from '../../components/ReportModal';
+import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import { updateProfileRequest } from '../../services/authService';
 import {
@@ -31,14 +33,21 @@ import {
   reserveDonationRequest,
   unreserveDonationRequest,
 } from '../../services/donationService';
+import {
+  DonorFeedback,
+  DonorRatingSummary,
+  donorConfirmReceivedRequest,
+  getUserFeedbackRequest,
+  getUserRatingSummaryRequest,
+} from '../../services/transactionService';
 
 function daysUntil(dateStr: string): number {
   const diffMs = new Date(dateStr).getTime() - Date.now();
   return Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
 }
 
-type TabType = 'Minhas doações' | 'Historia' | 'Favoritos';
-const TABS: TabType[] = ['Minhas doações', 'Historia', 'Favoritos'];
+type TabType = 'Minhas doações' | 'Historia' | 'Favoritos' | 'Comentários';
+const TABS: TabType[] = ['Minhas doações', 'Historia', 'Favoritos', 'Comentários'];
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -66,6 +75,12 @@ export default function ProfileScreen() {
   const [interestedLoading, setInterestedLoading] = useState(false);
   const [selectingUserId, setSelectingUserId] = useState<number | null>(null);
   const [unreserveLoadingId, setUnreserveLoadingId] = useState<number | null>(null);
+  const [finalizingId, setFinalizingId] = useState<number | null>(null);
+
+  const [ratingSummary, setRatingSummary] = useState<DonorRatingSummary>({ average: null, count: 0 });
+  const [feedback, setFeedback] = useState<DonorFeedback[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [reportCommentId, setReportCommentId] = useState<number | null>(null);
 
   const { signOut, user, token, updateUserLocally } = useAuth();
 
@@ -98,6 +113,16 @@ export default function ProfileScreen() {
       .catch(() => setWishlist([]))
       .finally(() => setWishlistLoading(false));
   }, [token]);
+
+  useEffect(() => {
+    if (!user) return;
+    setFeedbackLoading(true);
+    getUserRatingSummaryRequest(user.id).then(setRatingSummary).catch(() => {});
+    getUserFeedbackRequest(user.id)
+      .then(setFeedback)
+      .catch(() => setFeedback([]))
+      .finally(() => setFeedbackLoading(false));
+  }, [user]);
 
   async function handleAvatarChange() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -158,6 +183,20 @@ export default function ProfileScreen() {
       setActionError('Não foi possível desreservar a doação.');
     } finally {
       setUnreserveLoadingId(null);
+    }
+  }
+
+  async function handleFinalizeDonation(donationId: number) {
+    if (!token) return;
+    setActionError('');
+    setFinalizingId(donationId);
+    try {
+      await donorConfirmReceivedRequest(token, donationId);
+      setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: 'completed' } : d));
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Não foi possível finalizar a doação.');
+    } finally {
+      setFinalizingId(null);
     }
   }
 
@@ -357,13 +396,27 @@ export default function ProfileScreen() {
                             )}
                           </TouchableOpacity>
                         )}
-                        {((d.status === 'reserved' && !d.reserved_for_user_id) || d.status === 'completed') && (
+                        {d.status === 'reserved' && !d.reserved_for_user_id && (
                           <TouchableOpacity
                             style={[styles.actionChip, styles.actionChipGreen]}
+                            onPress={() => handleFinalizeDonation(d.id)}
+                            activeOpacity={0.7}
+                            disabled={finalizingId === d.id}
+                          >
+                            {finalizingId === d.id ? (
+                              <ActivityIndicator size="small" color="#27AE60" />
+                            ) : (
+                              <Text style={[styles.actionChipText, styles.actionChipTextGreen]}>Finalizar</Text>
+                            )}
+                          </TouchableOpacity>
+                        )}
+                        {((d.status === 'reserved' && !d.reserved_for_user_id) || d.status === 'completed') && (
+                          <TouchableOpacity
+                            style={styles.actionChip}
                             onPress={() => router.push({ pathname: '/transaction', params: { id: String(d.id) } })}
                             activeOpacity={0.7}
                           >
-                            <Text style={[styles.actionChipText, styles.actionChipTextGreen]}>Ver envio</Text>
+                            <Text style={styles.actionChipText}>Ver envio</Text>
                           </TouchableOpacity>
                         )}
                         <TouchableOpacity style={[styles.actionChip, styles.actionChipDanger]} onPress={() => handleDeleteDonation(d.id)} activeOpacity={0.7}>
@@ -483,7 +536,72 @@ export default function ProfileScreen() {
               )
             )}
 
+            {activeTab === 'Comentários' && (
+              feedbackLoading ? (
+                <ActivityIndicator color={COLORS.primary} style={{ padding: 30 }} />
+              ) : (
+                <View>
+                  <View style={styles.ratingSummaryRow}>
+                    <RatingStars value={ratingSummary.average ?? 0} size={20} />
+                    <Text style={styles.ratingSummaryText}>
+                      {ratingSummary.average != null
+                        ? `${ratingSummary.average.toFixed(1)} (${ratingSummary.count} avaliação${ratingSummary.count === 1 ? '' : 'ões'})`
+                        : 'Ainda sem avaliações'}
+                    </Text>
+                  </View>
+
+                  {feedback.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyStateText}>Nenhum comentário ainda.</Text>
+                    </View>
+                  ) : (
+                    feedback.map(item => (
+                      <View key={item.id} style={styles.feedbackCard}>
+                        <View style={styles.feedbackCardHeader}>
+                          <View style={styles.feedbackAuthorRow}>
+                            <View style={styles.feedbackAvatar}>
+                              {item.recipient_avatar_url ? (
+                                <Image source={{ uri: item.recipient_avatar_url }} style={styles.feedbackAvatarImage} />
+                              ) : (
+                                <FontAwesome name="user-circle-o" size={22} color={COLORS.textLight} />
+                              )}
+                            </View>
+                            <Text style={styles.feedbackAuthor}>{item.recipient_name}</Text>
+                          </View>
+                          <View style={styles.feedbackHeaderRight}>
+                            <Text style={styles.feedbackDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
+                            <TouchableOpacity
+                              onPress={() => setReportCommentId(item.id)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <FontAwesome name="flag-o" size={14} color={COLORS.textLight} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <Text style={styles.feedbackDonationTitle}>sobre &quot;{item.donation_title}&quot;</Text>
+                        <Text style={styles.feedbackComment}>{item.comment}</Text>
+                        {item.photos.length > 0 && (
+                          <View style={styles.feedbackPhotoRow}>
+                            {item.photos.map(url => (
+                              <Image key={url} source={{ uri: url }} style={styles.feedbackPhoto} resizeMode="cover" />
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    ))
+                  )}
+                </View>
+              )
+            )}
+
           </View>
+
+          <ReportModal
+            visible={reportCommentId != null}
+            onClose={() => setReportCommentId(null)}
+            targetType="comment"
+            targetId={reportCommentId ?? 0}
+          />
 
           {showLogoutConfirm ? (
             <View style={styles.logoutConfirmBox}>
@@ -589,4 +707,20 @@ const styles = StyleSheet.create({
   historyBadgeDoneText: { fontSize: 11, fontWeight: 'bold', color: COLORS.primary },
   historyBadgeReceived: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: 'rgba(254,108,0,0.1)', borderWidth: 1, borderColor: COLORS.secondary },
   historyBadgeReceivedText: { fontSize: 11, fontWeight: 'bold', color: COLORS.secondary },
+
+  // Comentários tab
+  ratingSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 },
+  ratingSummaryText: { fontSize: 14, color: COLORS.textDark },
+  feedbackCard: { backgroundColor: '#FFF', borderRadius: SIZES.radius, padding: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
+  feedbackCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  feedbackAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  feedbackHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  feedbackAvatar: { width: 22, height: 22, borderRadius: 11, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  feedbackAvatarImage: { width: 22, height: 22 },
+  feedbackAuthor: { fontSize: 14, fontWeight: 'bold', color: '#000' },
+  feedbackDate: { fontSize: 12, color: COLORS.textLight },
+  feedbackDonationTitle: { fontSize: 12, color: COLORS.textLight, fontStyle: 'italic', marginBottom: 8 },
+  feedbackComment: { fontSize: 14, color: COLORS.textDark, lineHeight: 20 },
+  feedbackPhotoRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  feedbackPhoto: { width: 64, height: 64, borderRadius: 8, backgroundColor: COLORS.border },
 });

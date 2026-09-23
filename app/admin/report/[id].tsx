@@ -14,7 +14,7 @@ import {
   updateReportStatusRequest,
   warnUserRequest,
 } from '../../../services/adminService';
-import { REPORT_REASONS } from '../../../services/reportService';
+import { REPORT_REASONS, REPORT_TARGET_ICONS, REPORT_TARGET_LABELS } from '../../../services/reportService';
 
 function reasonLabel(reason: string): string {
   return REPORT_REASONS.find(r => r.value === reason)?.label ?? reason;
@@ -123,10 +123,8 @@ export default function AdminReportDetailScreen() {
 
       <View style={styles.card}>
         <View style={styles.typeTag}>
-          <FontAwesome name={report.target_type === 'donation' ? 'file-text-o' : 'comment-o'} size={12} color="#FFF" />
-          <Text style={styles.typeTagText}>
-            {report.target_type === 'donation' ? 'Denúncia de Post' : 'Denúncia de Chat'}
-          </Text>
+          <FontAwesome name={REPORT_TARGET_ICONS[report.target_type] as any} size={12} color="#FFF" />
+          <Text style={styles.typeTagText}>{REPORT_TARGET_LABELS[report.target_type]}</Text>
         </View>
 
         <Text style={styles.title}>{reasonLabel(report.reason)}</Text>
@@ -210,6 +208,14 @@ export default function AdminReportDetailScreen() {
                 <Text style={styles.messageContent}>{m.content}</Text>
               </View>
             ))}
+          </>
+        )}
+
+        {report.comment && (
+          <>
+            <Text style={styles.sectionLabel}>COMENTÁRIO DENUNCIADO</Text>
+            <Text style={styles.descriptionMuted}>sobre &quot;{report.comment.donation_title}&quot;</Text>
+            <Text style={styles.personText}>{report.comment.comment}</Text>
           </>
         )}
 
