@@ -11,6 +11,7 @@ export interface FeedDonation {
   in_wishlist: boolean;
   donor_id: number;
   donor_name: string;
+  donor_avatar_url: string | null;
   created_at: string;
 }
 

@@ -1,6 +1,7 @@
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useState } from 'react';
 import {
   Image,
@@ -21,7 +22,7 @@ import { useAuth } from '../../services/AuthContext';
 import { Category, createDonationRequest } from '../../services/donationService';
 
 
-const CATEGORIES: Category[] = ['Coleiras', 'Rações', 'Higiene'];
+const CATEGORIES: Category[] = ['Coleiras', 'Rações', 'Higiene', 'Brinquedo', 'Vestir', 'Banho'];
 const MAX_PHOTOS = 5;
 
 export default function DonateScreen() {
@@ -101,6 +102,7 @@ export default function DonateScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <Head><title>Criar doação | Pote Cheio</title></Head>
       <MainHeader />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">

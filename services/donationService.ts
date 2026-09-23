@@ -1,6 +1,6 @@
 const API_URL = 'https://api.potecheio.site';
 
-export type Category = 'Coleiras' | 'Rações' | 'Higiene';
+export type Category = 'Coleiras' | 'Rações' | 'Higiene' | 'Brinquedo' | 'Vestir' | 'Banho';
 export type DonationStatus = 'available' | 'reserved' | 'completed';
 
 export interface Donation {
@@ -16,10 +16,12 @@ export interface Donation {
   donor_id: number;
   donor_name: string;
   donor_created_at: string;
+  donor_avatar_url?: string | null;
   created_at: string;
   reserved_for_user_id?: number | null;
   reserved_for_name?: string | null;
   reserved_until?: string | null;
+  interested_count?: number;
 }
 
 export interface CreateDonationPayload {
@@ -71,7 +73,10 @@ export async function getMyDonationsRequest(token: string): Promise<Donation[]> 
   const response = await fetch(`${API_URL}/donations/mine`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new Error('Erro ao carregar suas doações');
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error ?? err?.message ?? `Erro ao carregar suas doações (${response.status})`);
+  }
   const data = await response.json();
   return data.donations;
 }

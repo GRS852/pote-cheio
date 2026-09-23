@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../constants/theme';
@@ -27,6 +28,7 @@ function ContactAvatar({ name, avatarUrl, size, bg }: { name: string; avatarUrl?
 }
 
 export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose, fallbackUserName, fallbackUserAvatar }: ChatWidgetProps) {
+  const router = useRouter();
   const { token, user } = useAuth();
   const [localIsOpen, setLocalIsOpen] = useState(false);
   const isOpen = forceOpen || localIsOpen;
@@ -156,15 +158,25 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
               <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
           )}
-          <View style={[styles.avatarMini, { overflow: 'hidden' }]}>
-            <ContactAvatar name={name} avatarUrl={avatar} size={35} bg="#FFF" />
-          </View>
-          <View>
-            <Text style={styles.chatTitleSpecific}>{name}</Text>
-            {activeConv?.donation && (
-              <Text style={styles.chatSubSpecific} numberOfLines={1}>{activeConv.donation.title}</Text>
-            )}
-          </View>
+          <TouchableOpacity
+            style={styles.headerUserInfo}
+            activeOpacity={otherUser?.id ? 0.7 : 1}
+            disabled={!otherUser?.id}
+            onPress={() => router.push({
+              pathname: '/(app)/donor-profile',
+              params: { id: String(otherUser!.id), name, avatar: avatar ?? '' },
+            })}
+          >
+            <View style={[styles.avatarMini, { overflow: 'hidden' }]}>
+              <ContactAvatar name={name} avatarUrl={avatar} size={35} bg="#FFF" />
+            </View>
+            <View>
+              <Text style={styles.chatTitleSpecific}>{name}</Text>
+              {activeConv?.donation && (
+                <Text style={styles.chatSubSpecific} numberOfLines={1}>{activeConv.donation.title}</Text>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -273,6 +285,7 @@ const styles = StyleSheet.create({
   chatWindow: { backgroundColor: '#F5F5F5', width: 320, height: 440, borderRadius: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 8, overflow: 'hidden' },
   chatHeader: { backgroundColor: COLORS.primary, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  headerUserInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   chatTitle: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
   avatarMini: { width: 35, height: 35, borderRadius: 17.5, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   avatarMiniText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 16 },

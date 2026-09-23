@@ -102,7 +102,9 @@ export interface DonorFeedback {
   id: number;
   donation_id: number;
   donation_title: string;
+  recipient_id: number;
   recipient_name: string;
+  recipient_avatar_url: string | null;
   comment: string;
   photos: string[];
   created_at: string;
@@ -111,6 +113,12 @@ export interface DonorFeedback {
 export interface DonorRatingSummary {
   average: number | null;
   count: number;
+}
+
+export interface DonorDonationStats {
+  donated_count: number;
+  reserved_count: number;
+  received_count: number;
 }
 
 export async function getUserRatingSummaryRequest(userId: number): Promise<DonorRatingSummary> {
@@ -124,4 +132,10 @@ export async function getUserFeedbackRequest(userId: number): Promise<DonorFeedb
   if (!response.ok) throw new Error(`Erro ao carregar comentários (${response.status})`);
   const data = await response.json();
   return data.feedback;
+}
+
+export async function getUserDonationStatsRequest(userId: number): Promise<DonorDonationStats> {
+  const response = await fetch(`${API_URL}/users/${userId}/donation-stats`);
+  if (!response.ok) throw new Error(`Erro ao carregar estatísticas (${response.status})`);
+  return response.json();
 }

@@ -1,5 +1,6 @@
 import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -82,6 +83,7 @@ function ContactAvatar({
 export default function MessagesScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
+  const { conversationId } = useLocalSearchParams<{ conversationId?: string }>();
   const { width } = useWindowDimensions();
   const isWide = width >= 768;
 
@@ -128,6 +130,12 @@ export default function MessagesScreen() {
       .catch(() => setConversations([]))
       .finally(() => setConvLoading(false));
   }, [token]);
+
+  // Vindo de uma notificação de mensagem (?conversationId=), abre direto nela.
+  useEffect(() => {
+    if (!conversationId) return;
+    openConversation(Number(conversationId));
+  }, [conversationId, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openConversation(convId: number) {
     setActiveConvId(convId);
@@ -428,6 +436,7 @@ export default function MessagesScreen() {
 
   return (
     <View style={styles.screen}>
+      <Head><title>Mensagens | Pote Cheio</title></Head>
       <MainHeader />
       <View style={styles.body}>
         {showSidebar && renderSidebar()}
