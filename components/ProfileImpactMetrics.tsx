@@ -43,7 +43,7 @@ export default function ProfileImpactMetrics({
         <View>
           <Text style={styles.title}>Reservados</Text>
           <Text style={[styles.value, { color: COLORS.textDark }]}>{itemsReservedCount}</Text>
-          <Text style={styles.subtitle}>itens que você reservou</Text>
+          <Text style={styles.subtitle}>Itens reservados</Text>
         </View>
       </View>
 
