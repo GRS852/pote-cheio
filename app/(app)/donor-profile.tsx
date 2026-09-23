@@ -8,6 +8,7 @@ import MainHeader from '../../components/MainHeader';
 import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
 import ProfileUserInfo from '../../components/ProfileUserInfo';
 import RatingStars from '../../components/RatingStars';
+import ReportModal from '../../components/ReportModal';
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import { getUserByIdRequest } from '../../services/authService';
@@ -40,6 +41,7 @@ export default function DonorProfileScreen() {
   const [ratingSummary, setRatingSummary] = useState<DonorRatingSummary>({ average: null, count: 0 });
   const [feedback, setFeedback] = useState<DonorFeedback[]>([]);
   const [stats, setStats] = useState<DonorDonationStats>({ donated_count: 0, reserved_count: 0, received_count: 0 });
+  const [reportCommentId, setReportCommentId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -153,7 +155,15 @@ export default function DonorProfileScreen() {
                         </View>
                         <Text style={styles.feedbackAuthor}>{item.recipient_name}</Text>
                       </TouchableOpacity>
-                      <Text style={styles.feedbackDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
+                      <View style={styles.feedbackHeaderRight}>
+                        <Text style={styles.feedbackDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
+                        <TouchableOpacity
+                          onPress={() => setReportCommentId(item.id)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <FontAwesome name="flag-o" size={14} color={COLORS.textLight} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <Text style={styles.feedbackDonationTitle}>sobre &quot;{item.donation_title}&quot;</Text>
                     <Text style={styles.feedbackComment}>{item.comment}</Text>
@@ -172,6 +182,13 @@ export default function DonorProfileScreen() {
 
         </View>
       </ScrollView>
+
+      <ReportModal
+        visible={reportCommentId != null}
+        onClose={() => setReportCommentId(null)}
+        targetType="comment"
+        targetId={reportCommentId ?? 0}
+      />
     </View>
   );
 }
@@ -188,6 +205,7 @@ const styles = StyleSheet.create({
   feedbackCard: { backgroundColor: '#FFF', borderRadius: SIZES.radius, padding: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
   feedbackCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   feedbackAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  feedbackHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   feedbackAvatar: { width: 22, height: 22, borderRadius: 11, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   feedbackAvatarImage: { width: 22, height: 22 },
   feedbackAuthor: { fontSize: 14, fontWeight: 'bold', color: '#000' },
