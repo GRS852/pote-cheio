@@ -193,6 +193,7 @@ export default function ProfileScreen() {
     try {
       await donorConfirmReceivedRequest(token, donationId);
       setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: 'completed' } : d));
+      setActiveTab('Historia');
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Não foi possível finalizar a doação.');
     } finally {
