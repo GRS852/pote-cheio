@@ -1,6 +1,8 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 
 import ChatWidget from '../../components/ChatWidget';
 import MainHeader from '../../components/MainHeader';
@@ -9,13 +11,35 @@ import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import { FeedDonation, getFeedRequest } from '../../services/feedService';
 
-type FilterType = 'Todos' | 'Coleiras' | 'Rações' | 'Higiene';
+type FilterType = 'Todos' | 'Coleiras' | 'Rações' | 'Higiene' | 'Brinquedo' | 'Vestir' | 'Banho';
 
-const CATEGORIES = [
-  { id: '1', name: 'Todos' as FilterType },
-  { id: '2', name: 'Coleiras' as FilterType, icon: require('../../assets/images/coleiras.png') },
-  { id: '3', name: 'Rações' as FilterType,   icon: require('../../assets/images/racoes.png')  },
-  { id: '4', name: 'Higiene' as FilterType,  icon: require('../../assets/images/higiene.png') },
+// Coleiras/Rações/Higiene têm arte ilustrada própria; categorias novas usam
+// ícone vetorial por enquanto (sem precisar de arte nova pra cada uma).
+type CategoryIcon = { image: any } | { vector: string };
+
+const CATEGORY_ICONS: Partial<Record<FilterType, CategoryIcon>> = {
+  Coleiras: { image: require('../../assets/images/coleiras.png') },
+  Rações: { image: require('../../assets/images/racoes.png') },
+  Higiene: { image: require('../../assets/images/higiene.png') },
+  Brinquedo: { vector: 'toy-brick-outline' },
+  Vestir: { vector: 'hanger' },
+  Banho: { vector: 'shower' },
+};
+
+function CategoryIconView({ icon, size, color }: { icon?: CategoryIcon; size: number; color: string }) {
+  if (!icon) return null;
+  if ('image' in icon) return <Image source={icon.image} style={{ width: size, height: size }} />;
+  return <MaterialCommunityIcons name={icon.vector as any} size={size} color={color} />;
+}
+
+const CATEGORIES: { id: string; name: FilterType }[] = [
+  { id: '1', name: 'Todos' },
+  { id: '2', name: 'Coleiras' },
+  { id: '3', name: 'Rações' },
+  { id: '4', name: 'Higiene' },
+  { id: '5', name: 'Brinquedo' },
+  { id: '6', name: 'Vestir' },
+  { id: '7', name: 'Banho' },
 ];
 
 function groupByCategory(donations: FeedDonation[]): Record<string, FeedDonation[]> {
@@ -65,14 +89,9 @@ export default function HomeScreen() {
       ? Object.entries(grouped)
       : [[activeFilter, grouped[activeFilter] ?? []] as [string, FeedDonation[]]];
 
-  const categoryIcons: Record<string, any> = {
-    Coleiras: require('../../assets/images/coleiras.png'),
-    Rações:   require('../../assets/images/racoes.png'),
-    Higiene:  require('../../assets/images/higiene.png'),
-  };
-
   return (
     <View style={styles.mainContainer}>
+      <Head><title>Início | Pote Cheio</title></Head>
       <MainHeader searchValue={searchQuery} onSearchChange={setSearchQuery} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
@@ -93,7 +112,9 @@ export default function HomeScreen() {
                 style={[styles.filterPill, activeFilter === cat.name && styles.filterPillActive]}
                 onPress={() => setActiveFilter(cat.name)}
               >
-                {'icon' in cat && <Image source={cat.icon} style={styles.filterIcon} />}
+                <View style={styles.filterIconWrapper}>
+                  <CategoryIconView icon={CATEGORY_ICONS[cat.name]} size={16} color={activeFilter === cat.name ? '#FFF' : COLORS.textDark} />
+                </View>
                 <Text style={[styles.filterText, activeFilter === cat.name && styles.filterTextActive]}>{cat.name}</Text>
               </TouchableOpacity>
             ))}
@@ -114,9 +135,7 @@ export default function HomeScreen() {
               items.length === 0 ? null : (
                 <View key={category} style={styles.sectionContainer}>
                   <View style={styles.sectionHeader}>
-                    {categoryIcons[category] && (
-                      <Image source={categoryIcons[category]} style={styles.sectionIcon} />
-                    )}
+                    <CategoryIconView icon={CATEGORY_ICONS[category as FilterType]} size={20} color={COLORS.secondary} />
                     <Text style={styles.sectionTitle}>Doações {category}</Text>
                   </View>
 
@@ -130,6 +149,7 @@ export default function HomeScreen() {
                         in_wishlist={donation.in_wishlist}
                         isOwn={!!user && donation.donor_id === user.id}
                         donorName={donation.donor_name}
+                        donorAvatarUrl={donation.donor_avatar_url}
                         onPress={() => router.push({ pathname: '/product', params: { id: String(donation.id) } })}
                       />
                     ))}
@@ -158,7 +178,7 @@ const styles = StyleSheet.create({
   filtersScrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 12 },
   filterPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#FFF' },
   filterPillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  filterIcon: { width: 16, height: 16, marginRight: 6, resizeMode: 'contain' },
+  filterIconWrapper: { marginRight: 6 },
   filterText: { color: COLORS.textDark, fontWeight: '600' },
   filterTextActive: { color: '#FFF' },
   contentWrapper: { width: '100%', maxWidth: 1200, alignSelf: 'center', paddingVertical: 10 },
@@ -166,8 +186,7 @@ const styles = StyleSheet.create({
   emptyContainer: { padding: 60, alignItems: 'center' },
   emptyText: { fontSize: 16, color: COLORS.textLight },
   sectionContainer: { marginBottom: 10 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16, marginTop: 10 },
-  sectionIcon: { width: 20, height: 20, marginRight: 10, resizeMode: 'contain' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, marginBottom: 16, marginTop: 10 },
   sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#000' },
   carouselContent: { paddingHorizontal: 20, paddingBottom: 10 },
 });

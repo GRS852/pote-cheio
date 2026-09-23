@@ -1,5 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -44,6 +45,7 @@ export default function AdminAccountsScreen() {
 
   return (
     <View style={styles.container}>
+      <Head><title>Contas desativadas | Pote Cheio</title></Head>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backLink} onPress={() => router.push('/admin/dashboard')}>
           <FontAwesome name="chevron-left" size={12} color={COLORS.primary} />

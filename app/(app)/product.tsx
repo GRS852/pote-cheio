@@ -1,9 +1,11 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   DimensionValue,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -88,6 +90,7 @@ export default function ProductScreen() {
   if (loading) {
     return (
       <View style={styles.mainContainer}>
+        <Head><title>Pote Cheio</title></Head>
         <MainHeader />
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
@@ -99,6 +102,7 @@ export default function ProductScreen() {
   if (!donation) {
     return (
       <View style={styles.mainContainer}>
+        <Head><title>Doação não encontrada | Pote Cheio</title></Head>
         <MainHeader />
         <View style={styles.centerContainer}>
           <Text style={styles.errorText}>Doação não encontrada.</Text>
@@ -114,6 +118,7 @@ export default function ProductScreen() {
 
   return (
     <View style={styles.mainContainer}>
+      <Head><title>{donation.title} | Pote Cheio</title></Head>
       <MainHeader />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -191,7 +196,11 @@ export default function ProductScreen() {
                   })}
                 >
                   <View style={styles.donorAvatar}>
-                    <Text style={styles.donorAvatarLetter}>{donation.donor_name[0]}</Text>
+                    {donation.donor_avatar_url ? (
+                      <Image source={{ uri: donation.donor_avatar_url }} style={styles.donorAvatarImage} />
+                    ) : (
+                      <Text style={styles.donorAvatarLetter}>{donation.donor_name[0]}</Text>
+                    )}
                   </View>
                   <View style={styles.donorInfo}>
                     <Text style={styles.donorName}>{donation.donor_name}</Text>
@@ -251,7 +260,8 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', gap: 12, marginBottom: 24, flexWrap: 'wrap' },
   actionButtons: { gap: 12, marginBottom: 20, marginTop: 20 },
   donorCard: { flexDirection: 'row', backgroundColor: '#FFF', padding: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-  donorAvatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.primary, marginRight: 16, alignItems: 'center', justifyContent: 'center' },
+  donorAvatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.primary, marginRight: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  donorAvatarImage: { width: 60, height: 60 },
   donorAvatarLetter: { fontSize: 24, fontWeight: 'bold', color: '#FFF' },
   donorInfo: { flex: 1 },
   donorName: { fontSize: 18, fontWeight: 'bold', color: '#000', marginBottom: 4 },

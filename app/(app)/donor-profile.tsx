@@ -1,7 +1,8 @@
 import { FontAwesome } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import MainHeader from '../../components/MainHeader';
 import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
@@ -10,7 +11,14 @@ import RatingStars from '../../components/RatingStars';
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import { getUserByIdRequest } from '../../services/authService';
-import { DonorFeedback, DonorRatingSummary, getUserFeedbackRequest, getUserRatingSummaryRequest } from '../../services/transactionService';
+import {
+  DonorDonationStats,
+  DonorFeedback,
+  DonorRatingSummary,
+  getUserDonationStatsRequest,
+  getUserFeedbackRequest,
+  getUserRatingSummaryRequest,
+} from '../../services/transactionService';
 
 interface DonorData {
   name: string;
@@ -25,11 +33,13 @@ export default function DonorProfileScreen() {
     avatar?: string;
   }>();
   const { token } = useAuth();
+  const router = useRouter();
   const [donor, setDonor] = useState<DonorData | null>(null);
   // Show immediately from route params while API loads
   const [loading, setLoading] = useState(!paramName && !!id);
   const [ratingSummary, setRatingSummary] = useState<DonorRatingSummary>({ average: null, count: 0 });
   const [feedback, setFeedback] = useState<DonorFeedback[]>([]);
+  const [stats, setStats] = useState<DonorDonationStats>({ donated_count: 0, reserved_count: 0, received_count: 0 });
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -66,7 +76,19 @@ export default function DonorProfileScreen() {
     if (!id) return;
     getUserRatingSummaryRequest(Number(id)).then(setRatingSummary).catch(() => {});
     getUserFeedbackRequest(Number(id)).then(setFeedback).catch(() => {});
+    getUserDonationStatsRequest(Number(id)).then(setStats).catch(() => {});
   }, [id]);
+
+  function goToRecipientProfile(recipientId: number, recipientName: string, recipientAvatarUrl: string | null) {
+    router.push({
+      pathname: '/donor-profile',
+      params: {
+        id: String(recipientId),
+        name: recipientName,
+        ...(recipientAvatarUrl ? { avatar: recipientAvatarUrl } : {}),
+      },
+    });
+  }
 
   const displayName = donor?.name ?? paramName ?? 'Usuário';
   const displayAvatar = donor?.avatarUrl ?? (paramAvatar || null);
@@ -74,6 +96,7 @@ export default function DonorProfileScreen() {
 
   return (
     <View style={styles.mainContainer}>
+      <Head><title>{displayName} | Pote Cheio</title></Head>
       <MainHeader showSearch={false} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
@@ -96,9 +119,9 @@ export default function DonorProfileScreen() {
               />
 
               <ProfileImpactMetrics
-                itemsDonatedCount={0}
-                itemsReceivedCount={0}
-                itemsReservedCount={0}
+                itemsDonatedCount={stats.donated_count}
+                itemsReceivedCount={stats.received_count}
+                itemsReservedCount={stats.reserved_count}
               />
 
               <View style={styles.ratingSummaryRow}>
@@ -117,7 +140,19 @@ export default function DonorProfileScreen() {
                 feedback.map(item => (
                   <View key={item.id} style={styles.feedbackCard}>
                     <View style={styles.feedbackCardHeader}>
-                      <Text style={styles.feedbackAuthor}>{item.recipient_name}</Text>
+                      <TouchableOpacity
+                        style={styles.feedbackAuthorRow}
+                        onPress={() => goToRecipientProfile(item.recipient_id, item.recipient_name, item.recipient_avatar_url)}
+                      >
+                        <View style={styles.feedbackAvatar}>
+                          {item.recipient_avatar_url ? (
+                            <Image source={{ uri: item.recipient_avatar_url }} style={styles.feedbackAvatarImage} />
+                          ) : (
+                            <FontAwesome name="user-circle-o" size={22} color={COLORS.textLight} />
+                          )}
+                        </View>
+                        <Text style={styles.feedbackAuthor}>{item.recipient_name}</Text>
+                      </TouchableOpacity>
                       <Text style={styles.feedbackDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
                     </View>
                     <Text style={styles.feedbackDonationTitle}>sobre &quot;{item.donation_title}&quot;</Text>
@@ -151,7 +186,10 @@ const styles = StyleSheet.create({
   feedbackSectionTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.secondary, marginTop: 28, marginBottom: 12, textTransform: 'uppercase' },
   feedbackEmpty: { fontSize: 14, color: COLORS.textLight },
   feedbackCard: { backgroundColor: '#FFF', borderRadius: SIZES.radius, padding: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
-  feedbackCardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  feedbackCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  feedbackAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  feedbackAvatar: { width: 22, height: 22, borderRadius: 11, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  feedbackAvatarImage: { width: 22, height: 22 },
   feedbackAuthor: { fontSize: 14, fontWeight: 'bold', color: '#000' },
   feedbackDate: { fontSize: 12, color: COLORS.textLight },
   feedbackDonationTitle: { fontSize: 12, color: COLORS.textLight, fontStyle: 'italic', marginBottom: 8 },

@@ -20,6 +20,7 @@ import {
   AppNotification,
   getNotificationsRequest,
   markAllReadRequest,
+  markNotificationReadRequest,
 } from '../services/notificationService';
 
 function timeAgo(dateStr: string): string {
@@ -90,6 +91,22 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
     } catch {}
   }
 
+  async function handleNotificationPress(n: AppNotification) {
+    if (token && !n.read) {
+      markNotificationReadRequest(token, n.id).catch(() => {});
+      setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+
+    setShowNotifPanel(false);
+
+    if (n.reference_type === 'donation' && n.reference_id != null) {
+      router.push({ pathname: '/(app)/product', params: { id: String(n.reference_id) } });
+    } else if (n.reference_type === 'conversation' && n.reference_id != null) {
+      router.push({ pathname: '/(app)/messages', params: { conversationId: String(n.reference_id) } });
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Modal
@@ -129,7 +146,12 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
                 {notifications.map(n => {
                   const icon = notifIconInfo(n.type);
                   return (
-                    <View key={n.id} style={[styles.notifItem, !n.read && styles.notifItemUnread]}>
+                    <TouchableOpacity
+                      key={n.id}
+                      style={[styles.notifItem, !n.read && styles.notifItemUnread]}
+                      onPress={() => handleNotificationPress(n)}
+                      activeOpacity={0.7}
+                    >
                       <View style={[styles.notifIconBox, { backgroundColor: icon.bg }]}>
                         <FontAwesome name={icon.name as any} size={16} color={icon.color} />
                       </View>
@@ -139,7 +161,7 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
                         <Text style={styles.notifItemTime}>{timeAgo(n.created_at)}</Text>
                       </View>
                       {!n.read && <View style={styles.unreadDot} />}
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </ScrollView>

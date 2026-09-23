@@ -12,9 +12,10 @@ export interface ProductCardProps {
   in_wishlist?: boolean;
   isOwn?: boolean;
   donorName?: string;
+  donorAvatarUrl?: string | null;
 }
 
-export default function ProductCard({ title, category, imageUrl, onPress, location, in_wishlist, isOwn, donorName }: ProductCardProps) {
+export default function ProductCard({ title, category, imageUrl, onPress, location, in_wishlist, isOwn, donorName, donorAvatarUrl }: ProductCardProps) {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
       <View style={styles.imageWrapper}>
@@ -41,7 +42,11 @@ export default function ProductCard({ title, category, imageUrl, onPress, locati
         <Text style={styles.title} numberOfLines={2}>{title}</Text>
         {donorName && (
           <View style={styles.donorRow}>
-            <FontAwesome name="user-circle-o" size={11} color={COLORS.textLight} />
+            {donorAvatarUrl ? (
+              <Image source={{ uri: donorAvatarUrl }} style={styles.donorAvatar} />
+            ) : (
+              <FontAwesome name="user-circle-o" size={14} color={COLORS.textLight} />
+            )}
             <Text style={styles.donorText} numberOfLines={1}>{donorName}</Text>
           </View>
         )}
@@ -76,6 +81,7 @@ const styles = StyleSheet.create({
   infoContainer: { padding: 12 },
   title: { fontSize: 14, fontWeight: 'bold', color: '#000', marginBottom: 4, minHeight: 34 },
   donorRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 },
+  donorAvatar: { width: 14, height: 14, borderRadius: 7, backgroundColor: COLORS.border },
   donorText: { fontSize: 11, color: COLORS.textLight, flex: 1 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   locationContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 5 },

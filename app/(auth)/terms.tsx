@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -10,6 +11,7 @@ export default function TermsScreen() {
 
   return (
     <View style={styles.mainContainer}>
+      <Head><title>Termos de serviço | Pote Cheio</title></Head>
       <AuthHeader />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>

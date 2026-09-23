@@ -1,5 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -95,6 +96,7 @@ export default function AdminUserActivityScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Head><title>{user.full_name ?? user.email} | Pote Cheio</title></Head>
       <TouchableOpacity style={styles.backLink} onPress={() => router.back()}>
         <FontAwesome name="chevron-left" size={12} color={COLORS.primary} />
         <Text style={styles.backLinkText}>Voltar</Text>
