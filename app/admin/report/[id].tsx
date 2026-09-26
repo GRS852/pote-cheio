@@ -5,13 +5,18 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import AdminDisableModal from '../../../components/AdminDisableModal';
+import AdminResolveModal from '../../../components/AdminResolveModal';
+import AdminTransferModal from '../../../components/AdminTransferModal';
 import AdminWarnModal from '../../../components/AdminWarnModal';
 import { COLORS, SIZES } from '../../../constants/theme';
 import { useAdminAuth } from '../../../services/AdminAuthContext';
 import {
   AdminReportDetail,
+  AdminSummary,
   disableUserRequest,
   getAdminReportRequest,
+  getAdminsRequest,
+  transferReportRequest,
   updateReportStatusRequest,
   warnUserRequest,
 } from '../../../services/adminService';
@@ -21,12 +26,12 @@ function reasonLabel(reason: string): string {
   return REPORT_REASONS.find(r => r.value === reason)?.label ?? reason;
 }
 
-const STATUS_ACTIONS: { value: string; label: string; color: string }[] = [
-  { value: 'reviewing', label: 'Assumir / marcar em análise', color: '#0B5DBB' },
-  { value: 'resolved', label: 'Marcar resolvida', color: COLORS.primary },
-  { value: 'dismissed', label: 'Descartar', color: COLORS.textDark },
-  { value: 'pending', label: 'Devolver (destravar)', color: COLORS.textLight },
-];
+function resolutionActionLabel(type?: string | null, banDays?: number | null): string | null {
+  if (type === 'disable_account') return 'Exclusão de conta';
+  if (type === 'warning') return banDays && banDays > 0 ? `Suspensão (${banDays} dia${banDays === 1 ? '' : 's'})` : 'Advertência';
+  if (type === 'reactivate_account') return 'Reativação de conta';
+  return null;
+}
 
 export default function AdminReportDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,6 +42,9 @@ export default function AdminReportDetailScreen() {
   const [updating, setUpdating] = useState(false);
   const [showWarnModal, setShowWarnModal] = useState(false);
   const [showDisableModal, setShowDisableModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [resolveAction, setResolveAction] = useState<'resolved' | 'dismissed' | null>(null);
+  const [admins, setAdmins] = useState<AdminSummary[]>([]);
 
   const load = useCallback(async () => {
     if (!adminToken || !id) return;
@@ -53,19 +61,37 @@ export default function AdminReportDetailScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (!adminToken) return;
+    getAdminsRequest(adminToken).then(setAdmins).catch(() => setAdmins([]));
+  }, [adminToken]);
+
   const lockedByOther = !!report?.assigned_admin_id && report.assigned_admin_id !== admin?.id;
+  const isMine = !!report?.assigned_admin_id && report.assigned_admin_id === admin?.id;
 
   async function handleStatusChange(status: string) {
     if (!adminToken || !report) return;
     setUpdating(true);
     try {
-      const updated = await updateReportStatusRequest(adminToken, report.id, status);
-      setReport({ ...report, ...updated });
+      await updateReportStatusRequest(adminToken, report.id, status);
+      await load();
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Não foi possível atualizar. Tente novamente.');
     } finally {
       setUpdating(false);
     }
+  }
+
+  async function handleResolve(comment: string) {
+    if (!adminToken || !report || !resolveAction) return;
+    await updateReportStatusRequest(adminToken, report.id, resolveAction, comment);
+    await load();
+  }
+
+  async function handleTransfer(toAdminId: number, reason: string) {
+    if (!adminToken || !report) return;
+    await transferReportRequest(adminToken, report.id, toAdminId, reason);
+    await load();
   }
 
   async function handleWarn(banDays: number, reason: string) {
@@ -206,44 +232,98 @@ export default function AdminReportDetailScreen() {
         )}
 
         <Text style={styles.sectionLabel}>STATUS DA DENÚNCIA</Text>
-        <View style={styles.actionsRow}>
-          {STATUS_ACTIONS.filter(a => a.value !== report.status).map(action => (
+
+        {(report.status === 'resolved' || report.status === 'dismissed') && (
+          <View style={styles.resolvedBanner}>
+            <FontAwesome name="check-circle" size={14} color="#1E7E34" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.resolvedBannerTitle}>
+                {report.status === 'dismissed' ? 'Descartada' : 'Análise concluída'} por: {report.resolved_by_name ?? 'administrador'}
+              </Text>
+              {resolutionActionLabel(report.resolution_action_type, report.resolution_ban_days) && (
+                <Text style={styles.resolvedBannerText}>
+                  Ação: {resolutionActionLabel(report.resolution_action_type, report.resolution_ban_days)}
+                </Text>
+              )}
+              {report.resolution_comment && (
+                <Text style={styles.resolvedBannerText}>Comentário: {report.resolution_comment}</Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {!isMine ? (
+          <View style={styles.actionsRow}>
             <TouchableOpacity
-              key={action.value}
-              style={[styles.actionBtn, { borderColor: action.color }, lockedByOther && styles.actionBtnDisabled]}
-              onPress={() => handleStatusChange(action.value)}
+              style={[styles.actionBtn, { borderColor: '#0B5DBB' }, lockedByOther && styles.actionBtnDisabled]}
+              onPress={() => handleStatusChange('reviewing')}
               disabled={updating || lockedByOther}
             >
-              <Text style={[styles.actionBtnText, { color: action.color }]}>{action.label}</Text>
+              <Text style={[styles.actionBtnText, { color: '#0B5DBB' }]}>Assumir / marcar em análise</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-
-        {report.reported_user_id && (
+          </View>
+        ) : report.status === 'reviewing' ? (
           <>
-            <Text style={styles.sectionLabel}>PUNIÇÕES AO USUÁRIO DENUNCIADO</Text>
             <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, { borderColor: '#B35A00' }, lockedByOther && styles.actionBtnDisabled]}
-                onPress={() => setShowWarnModal(true)}
-                disabled={lockedByOther}
-              >
-                <Text style={[styles.actionBtnText, { color: '#B35A00' }]}>Advertência / banir temporariamente</Text>
+              <TouchableOpacity style={[styles.actionBtn, { borderColor: COLORS.textLight }]} onPress={() => handleStatusChange('pending')} disabled={updating}>
+                <Text style={[styles.actionBtnText, { color: COLORS.textLight }]}>Devolver (destravar)</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionBtn, { borderColor: '#C0392B' }, lockedByOther && styles.actionBtnDisabled]}
-                onPress={() => setShowDisableModal(true)}
-                disabled={lockedByOther || report.reported_user_status === 'disabled'}
-              >
-                <Text style={[styles.actionBtnText, { color: '#C0392B' }]}>Excluir conta do usuário</Text>
+              <TouchableOpacity style={[styles.actionBtn, { borderColor: COLORS.primary }]} onPress={() => setResolveAction('resolved')} disabled={updating}>
+                <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Marcar resolvida</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, { borderColor: COLORS.textDark }]} onPress={() => setResolveAction('dismissed')} disabled={updating}>
+                <Text style={[styles.actionBtnText, { color: COLORS.textDark }]}>Descartar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, { borderColor: '#6C4AB6' }]} onPress={() => setShowTransferModal(true)} disabled={updating}>
+                <Text style={[styles.actionBtnText, { color: '#6C4AB6' }]}>Passar para outro administrador</Text>
               </TouchableOpacity>
             </View>
+
+            {report.reported_user_id && (
+              <>
+                <Text style={styles.sectionLabel}>PUNIÇÕES AO USUÁRIO DENUNCIADO</Text>
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { borderColor: '#B35A00' }]}
+                    onPress={() => setShowWarnModal(true)}
+                  >
+                    <Text style={[styles.actionBtnText, { color: '#B35A00' }]}>Advertência / banir temporariamente</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { borderColor: '#C0392B' }]}
+                    onPress={() => setShowDisableModal(true)}
+                    disabled={report.reported_user_status === 'disabled'}
+                  >
+                    <Text style={[styles.actionBtnText, { color: '#C0392B' }]}>Excluir conta do usuário</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </>
+        ) : (
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={[styles.actionBtn, { borderColor: COLORS.textLight }]} onPress={() => handleStatusChange('pending')} disabled={updating}>
+              <Text style={[styles.actionBtnText, { color: COLORS.textLight }]}>Reabrir (voltar para pendente)</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
       <AdminWarnModal visible={showWarnModal} onClose={() => setShowWarnModal(false)} onConfirm={handleWarn} />
       <AdminDisableModal visible={showDisableModal} onClose={() => setShowDisableModal(false)} onConfirm={handleDisableAccount} />
+      <AdminResolveModal
+        visible={resolveAction != null}
+        title={resolveAction === 'dismissed' ? 'Descartar denúncia' : 'Marcar denúncia como resolvida'}
+        onClose={() => setResolveAction(null)}
+        onConfirm={handleResolve}
+      />
+      <AdminTransferModal
+        visible={showTransferModal}
+        admins={admins}
+        currentAdminId={admin?.id}
+        onClose={() => setShowTransferModal(false)}
+        onConfirm={handleTransfer}
+      />
     </ScrollView>
   );
 }
@@ -281,6 +361,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   lockBannerText: { color: '#0B5DBB', fontSize: 13, fontWeight: '600', flex: 1 },
+  resolvedBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#E3F5E8',
+    borderRadius: SIZES.radius,
+    padding: 12,
+    marginBottom: 12,
+  },
+  resolvedBannerTitle: { color: '#1E7E34', fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  resolvedBannerText: { color: '#245C36', fontSize: 13, marginTop: 2 },
   sectionLabel: { fontSize: 12, fontWeight: 'bold', color: COLORS.secondary, textTransform: 'uppercase', marginTop: 18, marginBottom: 6 },
   description: { fontSize: 14, color: '#000', lineHeight: 20 },
   descriptionMuted: { fontSize: 13, color: COLORS.textDark, marginTop: 2 },

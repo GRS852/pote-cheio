@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import CancelDonationModal from '../../components/CancelDonationModal';
 import InterestedUsersModal from '../../components/InterestedUsersModal';
 import MainHeader from '../../components/MainHeader';
 import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
@@ -25,6 +26,7 @@ import { updateProfileRequest } from '../../services/authService';
 import {
   Donation,
   InterestedUser,
+  cancelDonationRequest,
   confirmDonationRequest,
   deleteDonationRequest,
   getInterestedUsersRequest,
@@ -76,6 +78,7 @@ export default function ProfileScreen() {
   const [selectingUserId, setSelectingUserId] = useState<number | null>(null);
   const [unreserveLoadingId, setUnreserveLoadingId] = useState<number | null>(null);
   const [finalizingId, setFinalizingId] = useState<number | null>(null);
+  const [cancelDonationId, setCancelDonationId] = useState<number | null>(null);
 
   const [ratingSummary, setRatingSummary] = useState<DonorRatingSummary>({ average: null, count: 0 });
   const [feedback, setFeedback] = useState<DonorFeedback[]>([]);
@@ -201,6 +204,13 @@ export default function ProfileScreen() {
     }
   }
 
+  async function handleCancelDonation(reason: string) {
+    if (!token || !cancelDonationId) return;
+    const donationId = cancelDonationId;
+    await cancelDonationRequest(token, donationId, reason);
+    setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: 'cancelled', cancel_reason: reason } : d));
+  }
+
   async function handleDeleteDonation(donationId: number) {
     if (!token) return;
     setActionError('');
@@ -255,9 +265,9 @@ export default function ProfileScreen() {
   }
 
   const statusLabel = (s: string) =>
-    s === 'available' ? 'Disponível' : s === 'reserved' ? 'Reservado' : 'Concluído';
+    s === 'available' ? 'Disponível' : s === 'reserved' ? 'Reservado' : s === 'cancelled' ? 'Cancelada' : 'Concluído';
   const statusColor = (s: string) =>
-    s === 'available' ? COLORS.primary : s === 'reserved' ? COLORS.secondary : COLORS.textLight;
+    s === 'available' ? COLORS.primary : s === 'reserved' ? COLORS.secondary : s === 'cancelled' ? '#C0392B' : COLORS.textLight;
 
   return (
     <View style={styles.mainContainer}>
@@ -277,6 +287,12 @@ export default function ProfileScreen() {
         loading={interestedLoading}
         onSelect={handleSelectInterestedUser}
         selectingUserId={selectingUserId}
+      />
+
+      <CancelDonationModal
+        visible={cancelDonationId != null}
+        onClose={() => setCancelDonationId(null)}
+        onConfirm={handleCancelDonation}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
@@ -372,6 +388,10 @@ export default function ProfileScreen() {
                         </Text>
                       )}
 
+                      {d.status === 'cancelled' && d.cancel_reason && (
+                        <Text style={styles.cancelledReasonText}>Motivo: {d.cancel_reason}</Text>
+                      )}
+
                       <View style={styles.donationActions}>
                         {d.status === 'available' && (
                           <TouchableOpacity style={styles.actionChip} onPress={() => handleOpenInterestedModal(d.id, 'reserve')} activeOpacity={0.7}>
@@ -420,9 +440,20 @@ export default function ProfileScreen() {
                             <Text style={styles.actionChipText}>Ver envio</Text>
                           </TouchableOpacity>
                         )}
-                        <TouchableOpacity style={[styles.actionChip, styles.actionChipDanger]} onPress={() => handleDeleteDonation(d.id)} activeOpacity={0.7}>
-                          <FontAwesome name="trash-o" size={13} color="#C0392B" />
-                        </TouchableOpacity>
+                        {d.status === 'reserved' && (
+                          <TouchableOpacity
+                            style={[styles.actionChip, styles.actionChipDanger]}
+                            onPress={() => setCancelDonationId(d.id)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.actionChipText, { color: '#C0392B' }]}>Cancelar</Text>
+                          </TouchableOpacity>
+                        )}
+                        {d.status !== 'cancelled' && (
+                          <TouchableOpacity style={[styles.actionChip, styles.actionChipDanger]} onPress={() => handleDeleteDonation(d.id)} activeOpacity={0.7}>
+                            <FontAwesome name="trash-o" size={13} color="#C0392B" />
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
                   ))}
@@ -691,6 +722,7 @@ const styles = StyleSheet.create({
   logoutConfirmBtnText: { fontSize: 15, color: '#FFF', fontWeight: '600' },
 
   reservedForText: { fontSize: 12, color: COLORS.textLight, marginTop: -4, marginBottom: 10 },
+  cancelledReasonText: { fontSize: 12, color: '#C0392B', fontStyle: 'italic', marginTop: -4, marginBottom: 10 },
   interestedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: 'rgba(254,108,0,0.1)' },
   interestedBadgeText: { fontSize: 12, fontWeight: '600', color: COLORS.secondary },
 

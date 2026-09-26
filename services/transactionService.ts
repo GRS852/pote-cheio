@@ -4,7 +4,8 @@ export type TransactionStatus =
   | 'accepted_awaiting_shipment'
   | 'shipped'
   | 'finalized_manual'
-  | 'finalized_automatic';
+  | 'finalized_automatic'
+  | 'cancelled';
 
 export type FinalizedBy = 'recipient' | 'donor' | 'automatic' | null;
 
@@ -27,6 +28,7 @@ export interface DonationTransaction {
   auto_finalize_at: string | null;
   has_rating: boolean;
   has_comment: boolean;
+  cancel_reason?: string | null;
 }
 
 async function handleTransactionResponse(response: Response): Promise<DonationTransaction> {
@@ -67,6 +69,18 @@ export async function donorConfirmReceivedRequest(token: string, donationId: num
     headers: { Authorization: `Bearer ${token}` },
   });
   return handleTransactionResponse(response);
+}
+
+export async function cancelTransactionRequest(token: string, donationId: number, reason: string): Promise<void> {
+  const response = await fetch(`${API_URL}/donations/${donationId}/transaction/cancel`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error ?? err?.message ?? 'Erro ao cancelar doação');
+  }
 }
 
 export async function createRatingRequest(token: string, donationId: number, rating: number): Promise<void> {

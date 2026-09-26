@@ -1,7 +1,7 @@
 const API_URL = 'https://api.potecheio.site';
 
 export type Category = 'Coleiras' | 'Rações' | 'Higiene' | 'Brinquedo' | 'Vestir' | 'Banho';
-export type DonationStatus = 'available' | 'reserved' | 'completed';
+export type DonationStatus = 'available' | 'reserved' | 'completed' | 'cancelled';
 
 export interface Donation {
   id: number;
@@ -22,6 +22,8 @@ export interface Donation {
   reserved_for_name?: string | null;
   reserved_until?: string | null;
   interested_count?: number;
+  cancel_reason?: string | null;
+  cancelled_at?: string | null;
 }
 
 export interface CreateDonationPayload {
@@ -192,4 +194,16 @@ export async function unreserveDonationRequest(token: string, donationId: number
   if (!response.ok) throw new Error('Erro ao desreservar doação');
   const data = await response.json();
   return data.donation;
+}
+
+export async function cancelDonationRequest(token: string, donationId: number, reason: string): Promise<void> {
+  const response = await fetch(`${API_URL}/donations/${donationId}/transaction/cancel`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error ?? err?.message ?? 'Erro ao cancelar doação');
+  }
 }
