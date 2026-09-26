@@ -4,6 +4,7 @@ import Head from 'expo-router/head';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import CancelDonationModal from '../../components/CancelDonationModal';
 import DonationCommentModal from '../../components/DonationCommentModal';
 import MainHeader from '../../components/MainHeader';
 import RatingModal from '../../components/RatingModal';
@@ -11,6 +12,7 @@ import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import {
   DonationTransaction,
+  cancelTransactionRequest,
   createCommentRequest,
   createRatingRequest,
   donorConfirmReceivedRequest,
@@ -49,6 +51,7 @@ export default function TransactionScreen() {
   const [actionError, setActionError] = useState('');
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   function load() {
     if (!token || !id) return;
@@ -88,7 +91,13 @@ export default function TransactionScreen() {
 
   const isDonor = user?.id === transaction.donor_id;
   const isFinalized = transaction.status.startsWith('finalized');
+  const isCancelled = transaction.status === 'cancelled';
   const currentStep = stepIndexFor(transaction.status);
+
+  async function handleCancel(reason: string) {
+    await cancelTransactionRequest(token!, transaction!.donation_id, reason);
+    load();
+  }
 
   async function runAction(action: () => Promise<DonationTransaction>) {
     setActionLoading(true);
@@ -132,7 +141,7 @@ export default function TransactionScreen() {
               </View>
             </View>
 
-            <View style={styles.stepper}>
+            {!isCancelled && <View style={styles.stepper}>
               {STEPS.map((step, index) => (
                 <React.Fragment key={step.key}>
                   <View style={styles.stepItem}>
@@ -146,11 +155,21 @@ export default function TransactionScreen() {
                   )}
                 </React.Fragment>
               ))}
-            </View>
+            </View>}
 
             {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
 
-            {!isFinalized && transaction.status === 'accepted_awaiting_shipment' && (
+            {isCancelled && (
+              <View style={styles.cancelledBox}>
+                <FontAwesome name="times-circle" size={22} color="#C0392B" />
+                <Text style={styles.cancelledTitle}>Doação cancelada</Text>
+                {transaction.cancel_reason ? (
+                  <Text style={styles.cancelledSubtitle}>{transaction.cancel_reason}</Text>
+                ) : null}
+              </View>
+            )}
+
+            {!isFinalized && !isCancelled && transaction.status === 'accepted_awaiting_shipment' && (
               isDonor ? (
                 <View style={styles.actionBox}>
                   <Text style={styles.actionText}>Combine a entrega com o beneficiário pelo chat. Quando entregar o item, finalize a doação.</Text>
@@ -176,7 +195,7 @@ export default function TransactionScreen() {
               )
             )}
 
-            {!isFinalized && transaction.status === 'shipped' && (
+            {!isFinalized && !isCancelled && transaction.status === 'shipped' && (
               isDonor ? (
                 <View style={styles.actionBox}>
                   <Text style={styles.actionText}>O beneficiário ainda não confirmou o recebimento.</Text>
@@ -205,6 +224,12 @@ export default function TransactionScreen() {
                   </TouchableOpacity>
                 </View>
               )
+            )}
+
+            {isDonor && !isFinalized && !isCancelled && (
+              <TouchableOpacity style={styles.cancelLink} onPress={() => setShowCancelModal(true)}>
+                <Text style={styles.cancelLinkText}>Cancelar doação</Text>
+              </TouchableOpacity>
             )}
 
             {isFinalized && (
@@ -264,6 +289,12 @@ export default function TransactionScreen() {
           setTransaction(prev => prev ? { ...prev, has_comment: true } : prev);
         }}
       />
+
+      <CancelDonationModal
+        visible={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={handleCancel}
+      />
     </View>
   );
 }
@@ -304,6 +335,11 @@ const styles = StyleSheet.create({
   finalizedBox: { alignItems: 'center', gap: 6, paddingVertical: 10 },
   finalizedTitle: { fontSize: 17, fontWeight: 'bold', color: '#000' },
   finalizedSubtitle: { fontSize: 13, color: COLORS.textLight, textAlign: 'center' },
+  cancelledBox: { alignItems: 'center', gap: 6, paddingVertical: 10 },
+  cancelledTitle: { fontSize: 17, fontWeight: 'bold', color: '#C0392B' },
+  cancelledSubtitle: { fontSize: 13, color: COLORS.textDark, textAlign: 'center' },
+  cancelLink: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
+  cancelLinkText: { fontSize: 13, color: '#C0392B', fontWeight: '600' },
   feedbackRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
   feedbackBtn: {
     flex: 1, flexDirection: 'row', gap: 6, backgroundColor: COLORS.secondary, borderRadius: SIZES.radius,

@@ -37,6 +37,16 @@ export interface AdminReportDetail extends AdminReport {
   donation?: Record<string, unknown> | null;
   messages?: { id: number; author_id: number; content: string; sent_at: string }[];
   comment?: { id: number; comment: string; donation_title: string } | null;
+  resolution_comment?: string | null;
+  resolved_by_name?: string | null;
+  resolution_action_type?: 'warning' | 'disable_account' | 'reactivate_account' | null;
+  resolution_ban_days?: number | null;
+}
+
+export interface AdminSummary {
+  id: number;
+  full_name: string;
+  email: string;
 }
 
 export interface AdminModerationAction {
@@ -132,12 +142,35 @@ export async function getAdminReportRequest(token: string, id: number): Promise<
   return data.report;
 }
 
-export async function updateReportStatusRequest(token: string, id: number, status: string): Promise<AdminReport> {
+export async function updateReportStatusRequest(
+  token: string,
+  id: number,
+  status: string,
+  comment?: string
+): Promise<AdminReport> {
   const data = await adminFetch(token, `/admin/reports/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, comment }),
   });
   return data.report;
+}
+
+export async function transferReportRequest(
+  token: string,
+  id: number,
+  toAdminId: number,
+  reason: string
+): Promise<AdminReport> {
+  const data = await adminFetch(token, `/admin/reports/${id}/transfer`, {
+    method: 'POST',
+    body: JSON.stringify({ to_admin_id: toAdminId, reason }),
+  });
+  return data.report;
+}
+
+export async function getAdminsRequest(token: string): Promise<AdminSummary[]> {
+  const data = await adminFetch(token, '/admin/admins');
+  return data.admins;
 }
 
 export async function getAdminUserActivityRequest(token: string, id: number): Promise<AdminUserActivity> {
