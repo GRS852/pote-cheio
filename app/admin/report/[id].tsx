@@ -115,7 +115,7 @@ export default function AdminReportDetailScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Head><title>Denúncia #{report.id} | Pote Cheio</title></Head>
+      <Head><title>{`Denúncia #${report.id} | Pote Cheio`}</title></Head>
       <TouchableOpacity style={styles.backLink} onPress={() => router.back()}>
         <FontAwesome name="chevron-left" size={12} color={COLORS.primary} />
         <Text style={styles.backLinkText}>Voltar</Text>
