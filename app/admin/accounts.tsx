@@ -2,7 +2,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAdminAuth } from '../../services/AdminAuthContext';
@@ -29,18 +29,15 @@ export default function AdminAccountsScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  function handleReactivate(id: number, name: string) {
+  async function handleReactivate(id: number, name: string) {
     if (!adminToken) return;
-    Alert.alert('Reativar conta', `Reativar a conta de ${name}?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Reativar',
-        onPress: async () => {
-          await reactivateUserRequest(adminToken, id);
-          load();
-        },
-      },
-    ]);
+    if (!window.confirm(`Reativar a conta de ${name}?`)) return;
+    try {
+      await reactivateUserRequest(adminToken, id);
+      load();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Não foi possível reativar a conta.');
+    }
   }
 
   return (
