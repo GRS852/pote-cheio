@@ -2,7 +2,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import AdminWarnModal from '../../../components/AdminWarnModal';
 import { COLORS, SIZES } from '../../../constants/theme';
@@ -60,7 +60,7 @@ export default function AdminReportDetailScreen() {
       const updated = await updateReportStatusRequest(adminToken, report.id, status);
       setReport({ ...report, ...updated });
     } catch (err) {
-      Alert.alert('Não foi possível atualizar', err instanceof Error ? err.message : 'Tente novamente.');
+      window.alert(err instanceof Error ? err.message : 'Não foi possível atualizar. Tente novamente.');
     } finally {
       setUpdating(false);
     }
@@ -72,27 +72,15 @@ export default function AdminReportDetailScreen() {
     await load();
   }
 
-  function handleDisableAccount() {
+  async function handleDisableAccount() {
     if (!adminToken || !report?.reported_user_id) return;
-    Alert.alert(
-      'Excluir conta do usuário',
-      'A conta será desativada imediatamente e removida em definitivo em 30 dias. Confirma?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await disableUserRequest(adminToken, report.reported_user_id as number, { report_id: report.id });
-              await load();
-            } catch (err) {
-              Alert.alert('Não foi possível excluir', err instanceof Error ? err.message : 'Tente novamente.');
-            }
-          },
-        },
-      ]
-    );
+    if (!window.confirm('Excluir conta do usuário\n\nA conta será desativada imediatamente e removida em definitivo em 30 dias. Confirma?')) return;
+    try {
+      await disableUserRequest(adminToken, report.reported_user_id as number, { report_id: report.id });
+      await load();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Não foi possível excluir. Tente novamente.');
+    }
   }
 
   if (loading) {
