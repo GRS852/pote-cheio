@@ -80,12 +80,27 @@ export default function AdminAccountsScreen() {
                     {item.days_remaining} dia{item.days_remaining === 1 ? '' : 's'} até a remoção definitiva
                   </Text>
                 </Text>
+                {item.disable_reason ? (
+                  <Text style={styles.cardReason} numberOfLines={2}>Motivo: {item.disable_reason}</Text>
+                ) : null}
+                <View style={styles.badgeRow}>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {item.warning_count} advertência{item.warning_count === 1 ? '' : 's'}
+                    </Text>
+                  </View>
+                  <View style={[styles.badge, styles.badgeDanger]}>
+                    <Text style={[styles.badgeText, styles.badgeTextDanger]}>
+                      {item.suspension_count} suspensão{item.suspension_count === 1 ? '' : 'ões'}
+                    </Text>
+                  </View>
+                </View>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.reactivateBtn}
                 onPress={() => handleReactivate(item.id, item.full_name ?? item.email)}
               >
-                <Text style={styles.reactivateBtnText}>Reativar</Text>
+                <Text style={styles.reactivateBtnText}>Reverter (reativar)</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -118,6 +133,12 @@ const styles = StyleSheet.create({
   cardMeta: { fontSize: 12, color: COLORS.textLight, marginTop: 6 },
   daysNormal: { color: COLORS.textDark, fontWeight: '600' },
   daysDanger: { color: '#C0392B', fontWeight: '700' },
+  cardReason: { fontSize: 12, color: COLORS.textDark, marginTop: 6, fontStyle: 'italic' },
+  badgeRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, backgroundColor: '#FFE5CC' },
+  badgeDanger: { backgroundColor: '#FBD5D0' },
+  badgeText: { fontSize: 11, fontWeight: 'bold', color: '#B35A00' },
+  badgeTextDanger: { color: '#C0392B' },
   reactivateBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: SIZES.radius, borderWidth: 1.5, borderColor: COLORS.primary },
   reactivateBtnText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 13 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: 12 },

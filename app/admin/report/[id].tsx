@@ -4,6 +4,7 @@ import Head from 'expo-router/head';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import AdminDisableModal from '../../../components/AdminDisableModal';
 import AdminWarnModal from '../../../components/AdminWarnModal';
 import { COLORS, SIZES } from '../../../constants/theme';
 import { useAdminAuth } from '../../../services/AdminAuthContext';
@@ -35,6 +36,7 @@ export default function AdminReportDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [showWarnModal, setShowWarnModal] = useState(false);
+  const [showDisableModal, setShowDisableModal] = useState(false);
 
   const load = useCallback(async () => {
     if (!adminToken || !id) return;
@@ -72,15 +74,11 @@ export default function AdminReportDetailScreen() {
     await load();
   }
 
-  async function handleDisableAccount() {
+  async function handleDisableAccount(reason: string) {
     if (!adminToken || !report?.reported_user_id) return;
-    if (!window.confirm('Excluir conta do usuário\n\nA conta será desativada imediatamente e removida em definitivo em 30 dias. Confirma?')) return;
-    try {
-      await disableUserRequest(adminToken, report.reported_user_id as number, { report_id: report.id });
-      await load();
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Não foi possível excluir. Tente novamente.');
-    }
+    await disableUserRequest(adminToken, report.reported_user_id, { report_id: report.id, reason });
+    await load();
+    window.alert('Conta excluída. Ela será removida definitivamente em 30 dias, a menos que seja reativada antes disso.');
   }
 
   if (loading) {
@@ -234,7 +232,7 @@ export default function AdminReportDetailScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionBtn, { borderColor: '#C0392B' }, lockedByOther && styles.actionBtnDisabled]}
-                onPress={handleDisableAccount}
+                onPress={() => setShowDisableModal(true)}
                 disabled={lockedByOther || report.reported_user_status === 'disabled'}
               >
                 <Text style={[styles.actionBtnText, { color: '#C0392B' }]}>Excluir conta do usuário</Text>
@@ -245,6 +243,7 @@ export default function AdminReportDetailScreen() {
       </View>
 
       <AdminWarnModal visible={showWarnModal} onClose={() => setShowWarnModal(false)} onConfirm={handleWarn} />
+      <AdminDisableModal visible={showDisableModal} onClose={() => setShowDisableModal(false)} onConfirm={handleDisableAccount} />
     </ScrollView>
   );
 }

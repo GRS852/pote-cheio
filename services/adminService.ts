@@ -87,6 +87,9 @@ export interface AdminDisabledAccount {
   full_name: string | null;
   disabled_at: string;
   days_remaining: number;
+  disable_reason: string | null;
+  warning_count: number;
+  suspension_count: number;
 }
 
 async function adminFetch(token: string, path: string, options: RequestInit = {}) {
