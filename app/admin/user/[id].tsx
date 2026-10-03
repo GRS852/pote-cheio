@@ -12,6 +12,7 @@ const ACTION_LABELS: Record<string, string> = {
   warning: 'Advertência',
   disable_account: 'Conta desativada',
   reactivate_account: 'Conta reativada',
+  remove_post: 'Publicação removida',
 };
 
 interface AdminMessage {

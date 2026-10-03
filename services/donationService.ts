@@ -1,7 +1,7 @@
 const API_URL = 'https://api.potecheio.site';
 
 export type Category = 'Coleiras' | 'Rações' | 'Higiene' | 'Brinquedo' | 'Vestir' | 'Banho';
-export type DonationStatus = 'available' | 'reserved' | 'completed' | 'cancelled';
+export type DonationStatus = 'available' | 'reserved' | 'completed' | 'cancelled' | 'removed';
 
 export interface Donation {
   id: number;
@@ -24,6 +24,35 @@ export interface Donation {
   interested_count?: number;
   cancel_reason?: string | null;
   cancelled_at?: string | null;
+  removed_reason?: string | null;
+}
+
+export type DonationStatusStage = 'pending' | 'accepted' | 'shipped';
+
+export interface DonationStatusItem {
+  donation_id: number;
+  title: string;
+  photo_url: string | null;
+  role: 'donor' | 'recipient';
+  stage: DonationStatusStage;
+  other_user_id: number | null;
+  other_user_name: string | null;
+  updated_at: string;
+  reserved_until: string | null;
+  interested_count: number | null;
+  reserved_for_me: boolean;
+}
+
+export async function getDonationStatusRequest(token: string): Promise<DonationStatusItem[]> {
+  const response = await fetch(`${API_URL}/donations/status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error ?? `Erro ao carregar o status das doações (${response.status})`);
+  }
+  const data = await response.json();
+  return data.items;
 }
 
 export interface CreateDonationPayload {

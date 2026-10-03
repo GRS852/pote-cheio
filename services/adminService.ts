@@ -39,7 +39,7 @@ export interface AdminReportDetail extends AdminReport {
   comment?: { id: number; comment: string; donation_title: string } | null;
   resolution_comment?: string | null;
   resolved_by_name?: string | null;
-  resolution_action_type?: 'warning' | 'disable_account' | 'reactivate_account' | null;
+  resolution_action_type?: 'warning' | 'disable_account' | 'reactivate_account' | 'remove_post' | null;
   resolution_ban_days?: number | null;
 }
 
@@ -54,7 +54,7 @@ export interface AdminModerationAction {
   admin_id: number;
   admin_name: string;
   report_id: number | null;
-  action_type: 'warning' | 'disable_account' | 'reactivate_account';
+  action_type: 'warning' | 'disable_account' | 'reactivate_account' | 'remove_post';
   ban_days: number | null;
   reason: string | null;
   created_at: string;
@@ -207,6 +207,17 @@ export async function disableUserRequest(
   payload: { reason?: string; report_id?: number }
 ): Promise<void> {
   await adminFetch(token, `/admin/users/${userId}/disable`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function removeDonationRequest(
+  token: string,
+  donationId: number,
+  payload: { reason: string; report_id?: number }
+): Promise<void> {
+  await adminFetch(token, `/admin/donations/${donationId}/remove`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
