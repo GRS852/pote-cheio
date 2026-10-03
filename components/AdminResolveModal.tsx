@@ -6,11 +6,24 @@ import { COLORS, SIZES } from '../constants/theme';
 interface AdminResolveModalProps {
   visible: boolean;
   title: string;
+  subtitle?: string;
+  label?: string;
+  placeholder?: string;
+  confirmLabel?: string;
   onClose: () => void;
   onConfirm: (comment: string) => Promise<void>;
 }
 
-export default function AdminResolveModal({ visible, title, onClose, onConfirm }: AdminResolveModalProps) {
+export default function AdminResolveModal({
+  visible,
+  title,
+  subtitle,
+  label = 'Comentário (obrigatório)',
+  placeholder = 'Descreva a conclusão da análise',
+  confirmLabel = 'Confirmar',
+  onClose,
+  onConfirm,
+}: AdminResolveModalProps) {
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,7 +36,7 @@ export default function AdminResolveModal({ visible, title, onClose, onConfirm }
 
   async function handleSubmit() {
     if (!comment.trim()) {
-      setError('Descreva o que foi concluído antes de confirmar.');
+      setError('Preencha o campo obrigatório antes de confirmar.');
       return;
     }
     setLoading(true);
@@ -49,21 +62,23 @@ export default function AdminResolveModal({ visible, title, onClose, onConfirm }
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Comentário (obrigatório)</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+
+          <Text style={styles.label}>{label}</Text>
           <TextInput
             style={styles.textArea}
             value={comment}
             onChangeText={setComment}
             multiline
             numberOfLines={3}
-            placeholder="Descreva a conclusão da análise"
+            placeholder={placeholder}
             placeholderTextColor={COLORS.textLight}
           />
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <TouchableOpacity style={[styles.submitBtn, loading && styles.submitBtnDisabled]} onPress={handleSubmit} disabled={loading}>
-            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>Confirmar</Text>}
+            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>{confirmLabel}</Text>}
           </TouchableOpacity>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -76,6 +91,7 @@ const styles = StyleSheet.create({
   box: { width: '100%', maxWidth: 420, backgroundColor: '#FFF', borderRadius: SIZES.radius, padding: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title: { fontSize: 18, fontWeight: 'bold', color: '#000' },
+  subtitle: { fontSize: 13, color: COLORS.textDark, marginBottom: 14 },
   label: { fontSize: 13, fontWeight: '600', color: COLORS.textDark, marginBottom: 8 },
   textArea: {
     backgroundColor: COLORS.inputBackground,

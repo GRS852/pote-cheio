@@ -7,7 +7,7 @@ import { AuthProvider, useAuth } from '../services/AuthContext';
 
 // Dentro de (app), só essas telas exigem login: doar, ver o próprio perfil
 // e mensagens. Catálogo, produto e perfil do doador ficam públicos.
-const PROTECTED_APP_ROUTES = ['donate', 'profile', 'messages'];
+const PROTECTED_APP_ROUTES = ['donate', 'profile', 'messages', 'donation-status'];
 
 function buildRedirectTarget(pathname: string, params: Record<string, unknown>): string {
   const query = new URLSearchParams();

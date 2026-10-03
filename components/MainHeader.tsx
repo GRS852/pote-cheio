@@ -265,18 +265,26 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
 
             <TouchableOpacity
               style={styles.userMenuItem}
-              onPress={() => { setShowUserMenu(false); router.push('/(app)/donate'); }}
+              onPress={() => { setShowUserMenu(false); router.push('/(app)/profile'); }}
             >
-              <FontAwesome name="gift" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
-              <Text style={styles.userMenuItemText}>Doar</Text>
+              <FontAwesome name="user" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
+              <Text style={styles.userMenuItemText}>Meu perfil</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.userMenuItem}
-              onPress={() => { setShowUserMenu(false); router.push('/(app)/profile'); }}
+              onPress={() => { setShowUserMenu(false); router.push('/(app)/donation-status'); }}
             >
-              <FontAwesome name="heart" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
-              <Text style={styles.userMenuItemText}>Minhas Doações</Text>
+              <FontAwesome name="truck" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
+              <Text style={styles.userMenuItemText}>Ver status de doação</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.userMenuItem}
+              onPress={() => { setShowUserMenu(false); router.push('/(app)/donate'); }}
+            >
+              <FontAwesome name="gift" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
+              <Text style={styles.userMenuItemText}>Doar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

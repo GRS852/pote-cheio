@@ -16,6 +16,7 @@ import {
 import CancelDonationModal from '../../components/CancelDonationModal';
 import InterestedUsersModal from '../../components/InterestedUsersModal';
 import MainHeader from '../../components/MainHeader';
+import ModerationNoticesCard from '../../components/ModerationNoticesCard';
 import ProfileImpactMetrics from '../../components/ProfileImpactMetrics';
 import ProfileUserInfo from '../../components/ProfileUserInfo';
 import RatingStars from '../../components/RatingStars';
@@ -42,6 +43,7 @@ import {
   getUserFeedbackRequest,
   getUserRatingSummaryRequest,
 } from '../../services/transactionService';
+import { ModerationNotice, getMyModerationNoticesRequest } from '../../services/moderationService';
 
 function daysUntil(dateStr: string): number {
   const diffMs = new Date(dateStr).getTime() - Date.now();
@@ -84,8 +86,14 @@ export default function ProfileScreen() {
   const [feedback, setFeedback] = useState<DonorFeedback[]>([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [reportCommentId, setReportCommentId] = useState<number | null>(null);
+  const [moderationNotices, setModerationNotices] = useState<ModerationNotice[]>([]);
 
   const { signOut, user, token, updateUserLocally } = useAuth();
+
+  useEffect(() => {
+    if (!token) return;
+    getMyModerationNoticesRequest(token).then(setModerationNotices).catch(() => setModerationNotices([]));
+  }, [token]);
 
   const memberSince = user?.created_at ? new Date(user.created_at).getFullYear().toString() : '';
   const completedCount = myDonations.filter(d => d.status === 'completed').length;
@@ -265,9 +273,16 @@ export default function ProfileScreen() {
   }
 
   const statusLabel = (s: string) =>
-    s === 'available' ? 'Disponível' : s === 'reserved' ? 'Reservado' : s === 'cancelled' ? 'Cancelada' : 'Concluído';
+    s === 'available' ? 'Disponível'
+      : s === 'reserved' ? 'Reservado'
+      : s === 'cancelled' ? 'Cancelada'
+      : s === 'removed' ? 'Removida pela moderação'
+      : 'Concluído';
   const statusColor = (s: string) =>
-    s === 'available' ? COLORS.primary : s === 'reserved' ? COLORS.secondary : s === 'cancelled' ? '#C0392B' : COLORS.textLight;
+    s === 'available' ? COLORS.primary
+      : s === 'reserved' ? COLORS.secondary
+      : s === 'cancelled' || s === 'removed' ? '#C0392B'
+      : COLORS.textLight;
 
   return (
     <View style={styles.mainContainer}>
@@ -311,6 +326,8 @@ export default function ProfileScreen() {
             onAvatarPress={handleAvatarChange}
             avatarLoading={avatarLoading}
           />
+
+          <ModerationNoticesCard notices={moderationNotices} />
 
           <ProfileImpactMetrics
             itemsDonatedCount={completedCount}
@@ -390,6 +407,10 @@ export default function ProfileScreen() {
 
                       {d.status === 'cancelled' && d.cancel_reason && (
                         <Text style={styles.cancelledReasonText}>Motivo: {d.cancel_reason}</Text>
+                      )}
+
+                      {d.status === 'removed' && d.removed_reason && (
+                        <Text style={styles.cancelledReasonText}>Motivo da remoção: {d.removed_reason}</Text>
                       )}
 
                       <View style={styles.donationActions}>

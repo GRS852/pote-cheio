@@ -16,6 +16,7 @@ import {
   disableUserRequest,
   getAdminReportRequest,
   getAdminsRequest,
+  removeDonationRequest,
   transferReportRequest,
   updateReportStatusRequest,
   warnUserRequest,
@@ -30,6 +31,7 @@ function resolutionActionLabel(type?: string | null, banDays?: number | null): s
   if (type === 'disable_account') return 'Exclusão de conta';
   if (type === 'warning') return banDays && banDays > 0 ? `Suspensão (${banDays} dia${banDays === 1 ? '' : 's'})` : 'Advertência';
   if (type === 'reactivate_account') return 'Reativação de conta';
+  if (type === 'remove_post') return 'Publicação removida';
   return null;
 }
 
@@ -43,6 +45,7 @@ export default function AdminReportDetailScreen() {
   const [showWarnModal, setShowWarnModal] = useState(false);
   const [showDisableModal, setShowDisableModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showRemovePostModal, setShowRemovePostModal] = useState(false);
   const [resolveAction, setResolveAction] = useState<'resolved' | 'dismissed' | null>(null);
   const [admins, setAdmins] = useState<AdminSummary[]>([]);
 
@@ -98,6 +101,13 @@ export default function AdminReportDetailScreen() {
     if (!adminToken || !report?.reported_user_id) return;
     await warnUserRequest(adminToken, report.reported_user_id, { ban_days: banDays, reason, report_id: report.id });
     await load();
+  }
+
+  async function handleRemovePost(reason: string) {
+    if (!adminToken || !report?.donation_id) return;
+    await removeDonationRequest(adminToken, report.donation_id, { reason, report_id: report.id });
+    await load();
+    window.alert('Publicação removida. Ela saiu do catálogo e o doador foi avisado do motivo.');
   }
 
   async function handleDisableAccount(reason: string) {
@@ -210,6 +220,11 @@ export default function AdminReportDetailScreen() {
           <>
             <Text style={styles.sectionLabel}>PUBLICAÇÃO DENUNCIADA</Text>
             <Text style={styles.personText}>{String(report.donation.title)}</Text>
+            {report.donation.status === 'removed' && (
+              <Text style={styles.warningTextDanger}>
+                Publicação removida pela moderação{report.donation.removed_reason ? ` — ${String(report.donation.removed_reason)}` : ''}
+              </Text>
+            )}
             <Text style={styles.descriptionMuted}>{String(report.donation.description ?? '')}</Text>
           </>
         )}
@@ -286,6 +301,14 @@ export default function AdminReportDetailScreen() {
               <>
                 <Text style={styles.sectionLabel}>PUNIÇÕES AO USUÁRIO DENUNCIADO</Text>
                 <View style={styles.actionsRow}>
+                  {report.target_type === 'donation' && report.donation && report.donation.status !== 'removed' && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { borderColor: '#8E44AD' }]}
+                      onPress={() => setShowRemovePostModal(true)}
+                    >
+                      <Text style={[styles.actionBtnText, { color: '#8E44AD' }]}>Remover apenas a publicação</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={[styles.actionBtn, { borderColor: '#B35A00' }]}
                     onPress={() => setShowWarnModal(true)}
@@ -319,6 +342,16 @@ export default function AdminReportDetailScreen() {
         title={resolveAction === 'dismissed' ? 'Descartar denúncia' : 'Marcar denúncia como resolvida'}
         onClose={() => setResolveAction(null)}
         onConfirm={handleResolve}
+      />
+      <AdminResolveModal
+        visible={showRemovePostModal}
+        title="Remover apenas a publicação"
+        subtitle="A publicação sai do catálogo e qualquer negociação em andamento é cancelada. A conta do usuário não é punida."
+        label="Motivo da remoção (obrigatório)"
+        placeholder="O doador verá esse motivo na notificação"
+        confirmLabel="Remover publicação"
+        onClose={() => setShowRemovePostModal(false)}
+        onConfirm={handleRemovePost}
       />
       <AdminTransferModal
         visible={showTransferModal}
