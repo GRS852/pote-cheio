@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { AdminSession, adminLoginRequest } from './adminService';
 
 const STORAGE_KEY = 'admin_token';
+const ADMIN_DATA_STORAGE_KEY = 'admin_data';
 
 async function saveAdminToken(value: string) {
   if (Platform.OS === 'web') {
@@ -29,6 +30,35 @@ async function removeAdminToken() {
   }
 }
 
+async function saveAdminData(value: AdminSession) {
+  const serialized = JSON.stringify(value);
+  if (Platform.OS === 'web') {
+    localStorage.setItem(ADMIN_DATA_STORAGE_KEY, serialized);
+  } else {
+    await SecureStore.setItemAsync(ADMIN_DATA_STORAGE_KEY, serialized);
+  }
+}
+
+async function loadStoredAdminData(): Promise<AdminSession | null> {
+  const stored = Platform.OS === 'web'
+    ? localStorage.getItem(ADMIN_DATA_STORAGE_KEY)
+    : await SecureStore.getItemAsync(ADMIN_DATA_STORAGE_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as AdminSession;
+  } catch {
+    return null;
+  }
+}
+
+async function removeAdminData() {
+  if (Platform.OS === 'web') {
+    localStorage.removeItem(ADMIN_DATA_STORAGE_KEY);
+  } else {
+    await SecureStore.deleteItemAsync(ADMIN_DATA_STORAGE_KEY);
+  }
+}
+
 type AdminAuthContextType = {
   isAdminAuthenticated: boolean;
   isAdminLoading: boolean;
@@ -47,9 +77,10 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   const [adminToken, setAdminToken] = useState<string | null>(null);
 
   useEffect(() => {
-    loadStoredAdminToken().then(stored => {
-      if (stored) {
-        setAdminToken(stored);
+    Promise.all([loadStoredAdminToken(), loadStoredAdminData()]).then(([storedToken, storedAdmin]) => {
+      if (storedToken) {
+        setAdminToken(storedToken);
+        setAdmin(storedAdmin);
         setIsAdminAuthenticated(true);
       }
       setIsAdminLoading(false);
@@ -59,6 +90,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   async function adminSignIn(email: string, password: string) {
     const { token, admin: adminData } = await adminLoginRequest(email, password);
     await saveAdminToken(token);
+    await saveAdminData(adminData);
     setAdminToken(token);
     setAdmin(adminData);
     setIsAdminAuthenticated(true);
@@ -66,6 +98,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   async function adminSignOut() {
     await removeAdminToken();
+    await removeAdminData();
     setAdminToken(null);
     setAdmin(null);
     setIsAdminAuthenticated(false);
