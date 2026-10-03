@@ -100,7 +100,10 @@ export default function AdminUserActivityScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Head><title>{user.full_name ?? user.email} | Pote Cheio</title></Head>
-      <TouchableOpacity style={styles.backLink} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={styles.backLink}
+        onPress={() => (router.canGoBack() ? router.back() : router.push('/admin/dashboard'))}
+      >
         <FontAwesome name="chevron-left" size={12} color={COLORS.primary} />
         <Text style={styles.backLinkText}>Voltar</Text>
       </TouchableOpacity>
