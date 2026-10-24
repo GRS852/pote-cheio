@@ -234,8 +234,12 @@ export default function AdminReportDetailScreen() {
             <Text style={styles.sectionLabel}>CONVERSA DENUNCIADA ({report.messages.length} mensagens)</Text>
             {report.messages.map(m => (
               <View key={m.id} style={styles.messageRow}>
-                <Text style={styles.messageAuthor}>Usuário #{m.author_id}</Text>
-                <Text style={styles.messageContent}>{m.content}</Text>
+                <Text style={styles.messageAuthor}>
+                  {m.type === 'topic' ? `Novo assunto · aberto pelo usuário #${m.author_id}` : `Usuário #${m.author_id}`}
+                </Text>
+                <Text style={[styles.messageContent, m.type === 'topic' && { fontWeight: 'bold', color: COLORS.secondary }]}>
+                  {m.type === 'topic' ? `📦 ${m.content}` : m.content}
+                </Text>
               </View>
             ))}
           </>

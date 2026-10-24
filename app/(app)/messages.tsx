@@ -14,7 +14,9 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import MainHeader from '../../components/MainHeader';
+import ClearConversationModal from '../../components/ClearConversationModal';
 import ReportModal from '../../components/ReportModal';
+import { TopicDivider, TopicFilterBar, filterByTopic, getTopics } from '../../components/ChatTopics';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
 import {
@@ -94,6 +96,9 @@ export default function MessagesScreen() {
   const [inputText, setInputText] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('Todas');
   const [searchText, setSearchText] = useState('');
+  // Assunto (doação) filtrado na conversa aberta; null = todos
+  const [selectedTopic, setSelectedTopic] = useState<number | null>(null);
+  const [clearConvId, setClearConvId] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const messagesRef = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -136,9 +141,18 @@ export default function MessagesScreen() {
   // duas pontas; a confirmação da minha própria troca a mensagem otimista.
   useEffect(() => {
     const offMessage = onNewMessage(msg => {
-      if (!conversationsRef.current.some(c => c.id === msg.conversation_id)) {
-        // Conversa nova (ou que estava oculta) — atualiza a lista lateral
+      if (msg.type === 'topic' || !conversationsRef.current.some(c => c.id === msg.conversation_id)) {
+        // Novo assunto ou conversa que não estava na lista (nova ou limpa):
+        // recarrega a lista lateral pra trazer assunto e ordem atualizados
         loadConversations();
+      } else {
+        // Sobe a conversa pro topo com a última mensagem
+        setConversations(prev => {
+          const conv = prev.find(c => c.id === msg.conversation_id);
+          if (!conv) return prev;
+          const updated = { ...conv, last_message: msg.content, last_message_type: msg.type ?? 'text', last_message_at: msg.sent_at };
+          return [updated, ...prev.filter(c => c.id !== msg.conversation_id)];
+        });
       }
       addMessages(msg.conversation_id, [msg]);
     });
@@ -165,6 +179,7 @@ export default function MessagesScreen() {
   }, [conversationId, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openConversation(convId: number) {
+    if (convId !== activeConvRef.current) setSelectedTopic(null);
     setActiveConvId(convId);
     activeConvRef.current = convId;
     if (messagesRef.current[convId]) {
@@ -183,13 +198,18 @@ export default function MessagesScreen() {
     }
   }
 
-  async function handleHideConversation(convId: number) {
-    if (!token) return;
-    try {
-      await hideConversationRequest(token, convId);
-      setConversations(prev => prev.filter(c => c.id !== convId));
-      if (activeConvId === convId) setActiveConvId(null);
-    } catch {}
+  // "Limpar conversa": some só para mim (erros aparecem no modal)
+  async function handleClearConversation() {
+    if (!token || clearConvId == null) return;
+    const convId = clearConvId;
+    await hideConversationRequest(token, convId);
+    setConversations(prev => prev.filter(c => c.id !== convId));
+    setMessages(prev => {
+      const next = { ...prev };
+      delete next[convId];
+      return next;
+    });
+    if (activeConvRef.current === convId) setActiveConvId(null);
   }
 
   function handleSend() {
@@ -203,27 +223,35 @@ export default function MessagesScreen() {
       content: text,
       sent_at: new Date().toISOString(),
       client_id: clientId,
+      type: 'text',
+      donation_id: selectedTopic,
     };
     setMessages(prev => ({
       ...prev,
       [activeConvId]: [...(prev[activeConvId] ?? []), optimistic],
     }));
-    sendSocketMessage(activeConvId, text, clientId);
+    sendSocketMessage(activeConvId, text, clientId, selectedTopic);
     setInputText('');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }
 
   const activeConv = conversations.find(c => c.id === activeConvId);
-  const currentMessages = activeConvId != null ? (messages[activeConvId] ?? []) : [];
+  const allMessages = activeConvId != null ? (messages[activeConvId] ?? []) : [];
+  const topics = getTopics(allMessages);
+  const currentMessages = filterByTopic(allMessages, selectedTopic);
+  // Assunto do cabeçalho: o filtrado ou, sem filtro, o mais recente
+  const headerTopic = topics.find(t => t.donation_id === selectedTopic) ?? topics[topics.length - 1]
+    ?? (activeConv?.topic_donation_id ? { donation_id: activeConv.topic_donation_id, title: activeConv.topic_title ?? '' } : undefined);
 
+  // Doando = há assunto sobre uma doação minha; Recebendo = sobre uma da outra pessoa
   const filteredConversations = conversations.filter(conv => {
-    if (activeTab === 'Doando' && conv.recipient_id !== user?.id) return false;
-    if (activeTab === 'Recebendo' && conv.sender_id !== user?.id) return false;
+    if (activeTab === 'Doando' && !conv.has_donating) return false;
+    if (activeTab === 'Recebendo' && !conv.has_receiving) return false;
     if (searchText) {
       const q = searchText.toLowerCase();
       const other = user ? getOtherUser(conv, user.id) : undefined;
       const name = (other?.full_name ?? '').toLowerCase();
-      const title = (conv.donation?.title ?? '').toLowerCase();
+      const title = (conv.topic_title ?? '').toLowerCase();
       if (!name.includes(q) && !title.includes(q)) return false;
     }
     return true;
@@ -287,14 +315,20 @@ export default function MessagesScreen() {
                 </View>
                 <View style={styles.convInfo}>
                   <Text style={styles.convName} numberOfLines={1}>{name}</Text>
-                  {conv.donation && (
-                    <Text style={styles.convSub} numberOfLines={1}>{conv.donation.title}</Text>
-                  )}
+                  {conv.topic_title ? (
+                    <Text style={styles.convSub} numberOfLines={1}>
+                      {conv.topic_title}
+                      {(conv.topic_count ?? 0) > 1
+                        ? ` · +${(conv.topic_count ?? 1) - 1} assunto${(conv.topic_count ?? 1) - 1 === 1 ? '' : 's'}`
+                        : ''}
+                    </Text>
+                  ) : null}
                 </View>
                 <View style={styles.convMeta}>
-                  <Text style={styles.convTime}>{timeAgo(conv.created_at)}</Text>
+                  <Text style={styles.convTime}>{timeAgo(conv.last_message_at ?? conv.created_at)}</Text>
                   <TouchableOpacity
-                    onPress={() => handleHideConversation(conv.id)}
+                    onPress={() => setClearConvId(conv.id)}
+                    accessibilityLabel="Limpar conversa"
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     style={{ marginTop: 6 }}
                   >
@@ -363,15 +397,15 @@ export default function MessagesScreen() {
             </View>
           </View>
 
-          {activeConv?.donation && (
+          {headerTopic && (
             <TouchableOpacity
               style={styles.chatAreaProduct}
               onPress={() =>
-                router.push({ pathname: '/(app)/product', params: { id: String(activeConv.donation!.id) } })
+                router.push({ pathname: '/(app)/product', params: { id: String(headerTopic.donation_id) } })
               }
             >
               <Text style={styles.chatAreaProductTitle} numberOfLines={2}>
-                {activeConv.donation.title}
+                {headerTopic.title}
               </Text>
               <FontAwesome name="chevron-right" size={12} color={COLORS.textLight} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
@@ -394,6 +428,8 @@ export default function MessagesScreen() {
           </Text>
         </View>
 
+        <TopicFilterBar topics={topics} selected={selectedTopic} onSelect={setSelectedTopic} />
+
         {/* Mensagens */}
         <ScrollView
           ref={scrollRef}
@@ -406,6 +442,16 @@ export default function MessagesScreen() {
           ) : (
             currentMessages.map(msg => {
               const fromMe = msg.author_id === user?.id;
+              if (msg.type === 'topic') {
+                return (
+                  <TopicDivider
+                    key={msg.id}
+                    message={msg}
+                    isMine={fromMe}
+                    onPress={() => router.push({ pathname: '/(app)/product', params: { id: String(msg.donation_id) } })}
+                  />
+                );
+              }
               return (
                 <View
                   key={msg.id}
@@ -430,11 +476,11 @@ export default function MessagesScreen() {
 
         {/* Input */}
         <View style={styles.inputArea}>
-          {activeConv?.donation && (
+          {headerTopic && (
             <TouchableOpacity
               style={styles.detailsBtn}
               onPress={() =>
-                router.push({ pathname: '/(app)/product', params: { id: String(activeConv.donation!.id) } })
+                router.push({ pathname: '/(app)/product', params: { id: String(headerTopic.donation_id) } })
               }
             >
               <FontAwesome name="file-text-o" size={13} color={COLORS.primary} style={{ marginRight: 6 }} />
@@ -475,6 +521,16 @@ export default function MessagesScreen() {
         {showSidebar && renderSidebar()}
         {showChatArea && renderChatArea()}
       </View>
+
+      <ClearConversationModal
+        visible={clearConvId != null}
+        otherUserName={(() => {
+          const conv = conversations.find(c => c.id === clearConvId);
+          return conv && user ? getOtherUser(conv, user.id)?.full_name : undefined;
+        })()}
+        onClose={() => setClearConvId(null)}
+        onConfirm={handleClearConversation}
+      />
     </View>
   );
 }

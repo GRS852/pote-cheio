@@ -17,7 +17,15 @@ export interface Conversation {
   sender_name?: string;
   recipient_name?: string;
   created_at: string;
-  donation?: { id: number; title: string };
+  // Assunto (doação) mais recente e resumo da conversa, vindos da API
+  topic_donation_id?: number | null;
+  topic_title?: string | null;
+  topic_count?: number;
+  has_donating?: boolean;
+  has_receiving?: boolean;
+  last_message?: string | null;
+  last_message_type?: 'text' | 'topic' | null;
+  last_message_at?: string | null;
   // Campo enriquecido pelo frontend após fetch
   other_user?: ConversationUser;
 }
@@ -63,6 +71,12 @@ export interface Message {
   sent_at: string;
   // Id temporário da mensagem otimista (antes do servidor confirmar)
   client_id?: string | null;
+  // 'topic' = marcador de assunto (nova doação na conversa)
+  type?: 'text' | 'topic';
+  donation_id?: number | null;
+  donation_title?: string | null;
+  donation_photo_url?: string | null;
+  donation_status?: string | null;
 }
 
 /**

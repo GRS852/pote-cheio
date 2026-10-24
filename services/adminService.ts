@@ -35,7 +35,7 @@ export interface AdminReportDetail extends AdminReport {
   banned_until?: string | null;
   reported_user_warning_count?: number;
   donation?: Record<string, unknown> | null;
-  messages?: { id: number; author_id: number; content: string; sent_at: string }[];
+  messages?: { id: number; author_id: number; content: string; sent_at: string; type?: 'text' | 'topic' }[];
   comment?: { id: number; comment: string; donation_title: string } | null;
   resolution_comment?: string | null;
   resolved_by_name?: string | null;
