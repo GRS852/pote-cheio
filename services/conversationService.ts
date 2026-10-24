@@ -61,6 +61,42 @@ export interface Message {
   author_id: number;
   content: string;
   sent_at: string;
+  // Id temporário da mensagem otimista (antes do servidor confirmar)
+  client_id?: string | null;
+}
+
+/**
+ * Junta mensagens novas (socket ou atualização periódica) na lista atual
+ * sem duplicar: troca a mensagem otimista pela real (mesmo client_id) e
+ * ignora as que já estão na lista (mesmo id).
+ */
+export function mergeMessages(current: Message[], incoming: Message[]): Message[] {
+  let result = current;
+  for (const msg of incoming) {
+    // A atualização periódica pode trazer a mensagem antes do socket (e sem
+    // client_id): nesse caso reconhece a otimista pelo autor + texto.
+    const optimisticIdx = result.findIndex(m =>
+      m.id < 0 &&
+      (msg.client_id ? m.client_id === msg.client_id : m.author_id === msg.author_id && m.content === msg.content)
+    );
+    if (result.some(m => m.id === msg.id)) {
+      if (optimisticIdx >= 0) result = result.filter((_, i) => i !== optimisticIdx);
+    } else if (optimisticIdx >= 0) {
+      result = result.map((m, i) => (i === optimisticIdx ? msg : m));
+    } else {
+      result = [...result, msg];
+    }
+  }
+  return result;
+}
+
+/** Maior id já confirmado pelo servidor (as otimistas têm id negativo). */
+export function lastServerMessageId(list: Message[]): number {
+  return list.reduce((max, m) => (m.id > max ? m.id : max), 0);
+}
+
+export function newClientId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export async function getConversationsRequest(
@@ -97,8 +133,9 @@ export async function getConversationsRequest(
   return convs;
 }
 
-export async function getMessagesRequest(token: string, conversationId: number): Promise<Message[]> {
-  const response = await fetch(`${API_URL}/conversations/${conversationId}/messages`, {
+export async function getMessagesRequest(token: string, conversationId: number, afterId?: number): Promise<Message[]> {
+  const query = afterId ? `?after=${afterId}` : '';
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/messages${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error('Erro ao carregar mensagens');

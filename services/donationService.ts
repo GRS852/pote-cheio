@@ -1,7 +1,7 @@
 const API_URL = 'https://api.potecheio.site';
 
 export type Category = 'Coleiras' | 'Rações' | 'Higiene' | 'Brinquedo' | 'Vestir' | 'Banho';
-export type DonationStatus = 'available' | 'reserved' | 'completed' | 'cancelled' | 'removed';
+export type DonationStatus = 'available' | 'reserved' | 'completed' | 'cancelled' | 'removed' | 'closed';
 
 export interface Donation {
   id: number;
@@ -25,31 +25,62 @@ export interface Donation {
   cancel_reason?: string | null;
   cancelled_at?: string | null;
   removed_reason?: string | null;
+  // Só no detalhe (GET /donations/:id), em relação ao usuário logado
+  received_by_me?: boolean;
+  is_my_transaction?: boolean;
 }
 
-export type DonationStatusStage = 'pending' | 'accepted' | 'shipped';
+// "Ver entregas": negociações aceitas, nas duas pontas
+export type DeliveryStage = 'accepted' | 'shipped';
 
-export interface DonationStatusItem {
+export interface DeliveryItem {
   donation_id: number;
   title: string;
   photo_url: string | null;
   role: 'donor' | 'recipient';
-  stage: DonationStatusStage;
+  stage: DeliveryStage;
   other_user_id: number | null;
   other_user_name: string | null;
   updated_at: string;
-  reserved_until: string | null;
-  interested_count: number | null;
-  reserved_for_me: boolean;
 }
 
-export async function getDonationStatusRequest(token: string): Promise<DonationStatusItem[]> {
+export async function getDeliveriesRequest(token: string): Promise<DeliveryItem[]> {
   const response = await fetch(`${API_URL}/donations/status`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error ?? `Erro ao carregar o status das doações (${response.status})`);
+    throw new Error(err?.error ?? `Erro ao carregar as entregas (${response.status})`);
+  }
+  const data = await response.json();
+  return data.items;
+}
+
+// "Ver doações": histórico completo, nas duas pontas
+export type HistoryStage = 'pending' | 'accepted' | 'shipped' | 'completed' | 'cancelled' | 'closed' | 'removed';
+
+export interface HistoryItem {
+  key: string;
+  donation_id: number;
+  title: string;
+  photo_url: string | null;
+  role: 'donor' | 'recipient';
+  stage: HistoryStage;
+  other_user_id: number | null;
+  other_user_name: string | null;
+  updated_at: string;
+  reserved_until?: string | null;
+  interested_count?: number | null;
+  reserved_for_me?: boolean;
+}
+
+export async function getDonationHistoryRequest(token: string): Promise<HistoryItem[]> {
+  const response = await fetch(`${API_URL}/donations/history`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error ?? `Erro ao carregar o histórico de doações (${response.status})`);
   }
   const data = await response.json();
   return data.items;
@@ -159,12 +190,16 @@ export async function updateDonationStatusRequest(
   return data.donation;
 }
 
-export async function deleteDonationRequest(token: string, donationId: number): Promise<void> {
+// Encerra a publicação (não apaga do banco): status passa a 'closed'
+export async function closeDonationRequest(token: string, donationId: number): Promise<void> {
   const response = await fetch(`${API_URL}/donations/${donationId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new Error('Erro ao excluir doação');
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error ?? 'Erro ao encerrar a publicação');
+  }
 }
 
 export interface InterestedUser {
