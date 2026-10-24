@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../constants/theme';
+import { TopicDivider, TopicFilterBar, filterByTopic, getTopics } from './ChatTopics';
+import ClearConversationModal from './ClearConversationModal';
 import { useAuth } from '../services/AuthContext';
 import { Conversation, Message, getConversationsRequest, getMessagesRequest, getOtherUser, hideConversationRequest, lastServerMessageId, mergeMessages, newClientId } from '../services/conversationService';
 import { onNewMessage, onReconnect, sendSocketMessage } from '../services/socketService';
@@ -40,6 +42,8 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
   const [convLoading, setConvLoading] = useState(false);
   const [msgLoading, setMsgLoading] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [selectedTopic, setSelectedTopic] = useState<number | null>(null);
+  const [clearConvId, setClearConvId] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const messagesRef = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -68,7 +72,13 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
 
   // Tempo real pelo socket global (conectado no login) + reconexão
   useEffect(() => {
-    const offMessage = onNewMessage(msg => addMessages(msg.conversation_id, [msg]));
+    const offMessage = onNewMessage(msg => {
+      // Novo assunto: atualiza a lista (assunto mais recente e ordem)
+      if (msg.type === 'topic' && token) {
+        getConversationsRequest(token, user?.id).then(setConversations).catch(() => {});
+      }
+      addMessages(msg.conversation_id, [msg]);
+    });
     const offReconnect = onReconnect(() => { fetchNewMessages(); });
     return () => { offMessage(); offReconnect(); };
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -97,6 +107,7 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
   }, [isOpen, forceOpenConversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openConversation(convId: number, force = false) {
+    if (convId !== activeConvRef.current) setSelectedTopic(null);
     setActiveConvId(convId);
     activeConvRef.current = convId;
     if (!force && messagesRef.current[convId]) { // use cache only when not forced
@@ -114,13 +125,18 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
     }
   }
 
-  async function handleHideConversation(convId: number) {
-    if (!token) return;
-    try {
-      await hideConversationRequest(token, convId);
-      setConversations(prev => prev.filter(c => c.id !== convId));
-      if (activeConvId === convId) setActiveConvId(null);
-    } catch {}
+  // "Limpar conversa": some só para mim (erros aparecem no modal)
+  async function handleClearConversation() {
+    if (!token || clearConvId == null) return;
+    const convId = clearConvId;
+    await hideConversationRequest(token, convId);
+    setConversations(prev => prev.filter(c => c.id !== convId));
+    setMessages(prev => {
+      const next = { ...prev };
+      delete next[convId];
+      return next;
+    });
+    if (activeConvRef.current === convId) setActiveConvId(null);
   }
 
   function handleClose() {
@@ -147,15 +163,21 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
       content: text,
       sent_at: new Date().toISOString(),
       client_id: clientId,
+      type: 'text',
+      donation_id: selectedTopic,
     };
     setMessages(prev => ({ ...prev, [activeConvId]: [...(prev[activeConvId] ?? []), optimistic] }));
-    sendSocketMessage(activeConvId, text, clientId);
+    sendSocketMessage(activeConvId, text, clientId, selectedTopic);
     setInputText('');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }
 
   const activeConv = conversations.find(c => c.id === activeConvId);
-  const currentMessages = activeConvId != null ? (messages[activeConvId] ?? []) : [];
+  const allMessages = activeConvId != null ? (messages[activeConvId] ?? []) : [];
+  const topics = getTopics(allMessages);
+  const currentMessages = filterByTopic(allMessages, selectedTopic);
+  const headerTopicTitle = topics.find(t => t.donation_id === selectedTopic)?.title
+    ?? topics[topics.length - 1]?.title ?? activeConv?.topic_title;
 
   const renderHeader = () => {
     if (activeConvId != null) {
@@ -184,9 +206,9 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
             </View>
             <View>
               <Text style={styles.chatTitleSpecific}>{name}</Text>
-              {activeConv?.donation && (
-                <Text style={styles.chatSubSpecific} numberOfLines={1}>{activeConv.donation.title}</Text>
-              )}
+              {headerTopicTitle ? (
+                <Text style={styles.chatSubSpecific} numberOfLines={1}>{headerTopicTitle}</Text>
+              ) : null}
             </View>
           </TouchableOpacity>
         </View>
@@ -208,6 +230,7 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
 
           {activeConvId != null ? (
             <>
+              <TopicFilterBar topics={topics} selected={selectedTopic} onSelect={setSelectedTopic} />
               <ScrollView
                 ref={scrollRef}
                 style={styles.messagesArea}
@@ -218,6 +241,17 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
                 ) : (
                   currentMessages.map(msg => {
                     const fromMe = msg.author_id === user?.id;
+                    if (msg.type === 'topic') {
+                      return (
+                        <TopicDivider
+                          key={msg.id}
+                          message={msg}
+                          isMine={fromMe}
+                          compact
+                          onPress={() => router.push({ pathname: '/(app)/product', params: { id: String(msg.donation_id) } })}
+                        />
+                      );
+                    }
                     return (
                       <View key={msg.id} style={fromMe ? styles.bubbleRight : styles.bubbleLeft}>
                         <Text style={fromMe ? styles.bubbleTextWhite : styles.bubbleText}>{msg.content}</Text>
@@ -265,12 +299,15 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
                         </View>
                         <View style={styles.chatInfo}>
                           <Text style={styles.chatUserName}>{name}</Text>
-                          {conv.donation && (
-                            <Text style={styles.chatMessage} numberOfLines={1}>{conv.donation.title}</Text>
-                          )}
+                          {conv.topic_title ? (
+                            <Text style={styles.chatMessage} numberOfLines={1}>
+                              {conv.topic_title}
+                              {(conv.topic_count ?? 0) > 1 ? ` · +${(conv.topic_count ?? 1) - 1}` : ''}
+                            </Text>
+                          ) : null}
                         </View>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.chatDeleteBtn} onPress={() => handleHideConversation(conv.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <TouchableOpacity style={styles.chatDeleteBtn} onPress={() => setClearConvId(conv.id)} accessibilityLabel="Limpar conversa" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Ionicons name="trash-outline" size={16} color={COLORS.textLight} />
                       </TouchableOpacity>
                     </View>
@@ -281,6 +318,16 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
           )}
         </View>
       )}
+
+      <ClearConversationModal
+        visible={clearConvId != null}
+        otherUserName={(() => {
+          const conv = conversations.find(c => c.id === clearConvId);
+          return conv && user ? getOtherUser(conv, user.id)?.full_name : undefined;
+        })()}
+        onClose={() => setClearConvId(null)}
+        onConfirm={handleClearConversation}
+      />
 
       <TouchableOpacity style={styles.fab} onPress={handleToggle} activeOpacity={0.8}>
         <MaterialCommunityIcons name={isOpen ? 'chat-processing' : 'chat-processing-outline'} size={32} color="#FFF" />

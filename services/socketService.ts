@@ -12,6 +12,11 @@ export interface SocketMessage {
   content: string;
   sent_at: string;
   client_id?: string | null;
+  type?: 'text' | 'topic';
+  donation_id?: number | null;
+  donation_title?: string | null;
+  donation_photo_url?: string | null;
+  donation_status?: string | null;
 }
 
 export interface SocketNotification {
@@ -67,8 +72,10 @@ export function joinRoom(conversationId: number): void {
   socket?.emit('join_room', { conversation_id: conversationId });
 }
 
-export function sendSocketMessage(conversationId: number, content: string, clientId?: string): void {
-  socket?.emit('send_message', { conversation_id: conversationId, content, client_id: clientId });
+// donationId = assunto da conversa a que a mensagem pertence (sem ele, o
+// servidor usa o assunto mais recente)
+export function sendSocketMessage(conversationId: number, content: string, clientId?: string, donationId?: number | null): void {
+  socket?.emit('send_message', { conversation_id: conversationId, content, client_id: clientId, donation_id: donationId ?? null });
 }
 
 // Os "on" devolvem a função que remove o listener (usar no cleanup do useEffect)

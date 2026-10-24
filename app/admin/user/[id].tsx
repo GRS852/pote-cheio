@@ -20,6 +20,8 @@ interface AdminMessage {
   author_id: number;
   content: string;
   sent_at: string;
+  // 'topic' = marcador de assunto (doação em que alguém demonstrou interesse)
+  type?: 'text' | 'topic';
 }
 
 function SectionCard({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
@@ -215,8 +217,12 @@ export default function AdminUserActivityScreen() {
                   ) : (
                     convMessages[c.id].map(m => (
                       <View key={m.id} style={styles.messageRow}>
-                        <Text style={styles.messageAuthor}>Usuário #{m.author_id}</Text>
-                        <Text style={styles.messageContent}>{m.content}</Text>
+                        <Text style={styles.messageAuthor}>
+                          {m.type === 'topic' ? `Novo assunto · aberto pelo usuário #${m.author_id}` : `Usuário #${m.author_id}`}
+                        </Text>
+                        <Text style={[styles.messageContent, m.type === 'topic' && { fontWeight: 'bold', color: COLORS.secondary }]}>
+                          {m.type === 'topic' ? `📦 ${m.content}` : m.content}
+                        </Text>
                       </View>
                     ))
                   )}
