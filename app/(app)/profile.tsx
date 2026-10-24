@@ -11,6 +11,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import CancelDonationModal from '../../components/CancelDonationModal';
@@ -51,8 +52,8 @@ function daysUntil(dateStr: string): number {
   return Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
 }
 
-type TabType = 'Minhas doações' | 'Historia' | 'Favoritos' | 'Comentários';
-const TABS: TabType[] = ['Minhas doações', 'Historia', 'Favoritos', 'Comentários'];
+type TabType = 'Minhas doações' | 'História' | 'Favoritos' | 'Comentários';
+const TABS: TabType[] = ['Minhas doações', 'História', 'Favoritos', 'Comentários'];
 
 // Tag dos favoritos: Em aberto (ainda não doada), Finalizada (doada para
 // alguém) ou Encerrada (o doador encerrou ou a moderação removeu).
@@ -73,6 +74,8 @@ const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 600;
   const [activeTab, setActiveTab] = useState<TabType>('Minhas doações');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -220,7 +223,7 @@ export default function ProfileScreen() {
     try {
       await donorConfirmReceivedRequest(token, donationId);
       setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: 'completed' } : d));
-      setActiveTab('Historia');
+      setActiveTab('História');
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Não foi possível finalizar a doação.');
     } finally {
@@ -359,18 +362,25 @@ export default function ProfileScreen() {
             itemsReservedCount={reservedCount}
           />
 
-          <View style={styles.tabsContainer}>
+          {/* Rolagem horizontal só nas abas: no celular elas não cabem na tela e
+              antes empurravam a página inteira para o lado */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsScroll}
+            contentContainerStyle={styles.tabsContainer}
+          >
             {TABS.map(tab => (
               <TouchableOpacity
                 key={tab}
-                style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
+                style={[styles.tabButton, isNarrow && styles.tabButtonNarrow, activeTab === tab && styles.tabButtonActive]}
                 onPress={() => setActiveTab(tab)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+                <Text style={[styles.tabText, isNarrow && styles.tabTextNarrow, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
 
           <View style={styles.tabContentCard}>
 
@@ -507,7 +517,7 @@ export default function ProfileScreen() {
               )
             )}
 
-            {activeTab === 'Historia' && (
+            {activeTab === 'História' && (
               (donationsLoading || wishlistLoading) ? (
                 <ActivityIndicator color={COLORS.primary} style={{ padding: 30 }} />
               ) : (
@@ -720,8 +730,11 @@ const styles = StyleSheet.create({
   scrollContainer: { flexGrow: 1, paddingBottom: 60 },
   contentWrapper: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: 30 },
   pageTitle: { fontSize: 24, fontWeight: 'bold', color: '#000', marginBottom: 20 },
-  tabsContainer: { flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: COLORS.border, marginBottom: 20 },
-  tabButton: { paddingVertical: 12, paddingHorizontal: 20, borderBottomWidth: 3, borderBottomColor: 'transparent', marginBottom: -2 },
+  tabsScroll: { flexGrow: 0, borderBottomWidth: 2, borderBottomColor: COLORS.border, marginBottom: 20 },
+  tabsContainer: { flexDirection: 'row' },
+  tabButton: { paddingVertical: 12, paddingHorizontal: 20, borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  tabButtonNarrow: { paddingHorizontal: 12 },
+  tabTextNarrow: { fontSize: 15 },
   tabButtonActive: { borderBottomColor: COLORS.primary },
   tabText: { fontSize: 18, fontWeight: 'bold', color: COLORS.textLight },
   tabTextActive: { color: COLORS.primary },

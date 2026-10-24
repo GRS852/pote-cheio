@@ -46,6 +46,8 @@ export function connectSocket(token: string): Socket {
   socket = io(API_URL, {
     auth: { token },
     transports: ['websocket', 'polling'],
+    // Sem isto o cliente não troca para long-polling quando a rede bloqueia WebSocket
+    tryAllTransports: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
   });
@@ -70,12 +72,6 @@ export function getSocket(): Socket | null {
 
 export function joinRoom(conversationId: number): void {
   socket?.emit('join_room', { conversation_id: conversationId });
-}
-
-// donationId = assunto da conversa a que a mensagem pertence (sem ele, o
-// servidor usa o assunto mais recente)
-export function sendSocketMessage(conversationId: number, content: string, clientId?: string, donationId?: number | null): void {
-  socket?.emit('send_message', { conversation_id: conversationId, content, client_id: clientId, donation_id: donationId ?? null });
 }
 
 // Os "on" devolvem a função que remove o listener (usar no cleanup do useEffect)
