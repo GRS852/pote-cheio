@@ -28,6 +28,33 @@ const SectionTitle = ({ title }: { title: string }) => (
   <Text style={styles.sectionTitle}>+ {title}</Text>
 );
 
+const STATUS_LABEL: Record<Donation['status'], string> = {
+  available: 'Disponível',
+  reserved: 'Reservado',
+  completed: 'Doado',
+  cancelled: 'Encerrada',
+  closed: 'Encerrada',
+  removed: 'Removida',
+};
+
+// Para quem não é o dono: a publicação não está mais disponível e, em vez
+// do anúncio, mostramos o que aconteceu com ela.
+function unavailableNotice(donation: Donation): { icon: React.ComponentProps<typeof FontAwesome>['name']; text: string; mine: boolean } | null {
+  switch (donation.status) {
+    case 'completed':
+      return donation.received_by_me
+        ? { icon: 'gift', text: 'Esse item foi doado para você', mine: true }
+        : { icon: 'handshake-o', text: 'Esse item foi doado para outra pessoa', mine: false };
+    case 'closed':
+    case 'cancelled':
+      return { icon: 'ban', text: 'Publicação encerrada', mine: false };
+    case 'removed':
+      return { icon: 'exclamation-triangle', text: 'Publicação violou as diretrizes do site', mine: false };
+    default:
+      return null;
+  }
+}
+
 export default function ProductScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
@@ -115,6 +142,48 @@ export default function ProductScreen() {
   }
 
   const isOwner = !!user && user.id === donation.donor_id;
+  const notice = isOwner ? null : unavailableNotice(donation);
+
+  if (notice) {
+    // Removida pela moderação: o conteúdo não é exibido (a API nem envia)
+    const showContent = donation.status !== 'removed';
+    return (
+      <View style={styles.mainContainer}>
+        <Head><title>{showContent ? `${donation.title} | Pote Cheio` : 'Publicação indisponível | Pote Cheio'}</title></Head>
+        <MainHeader />
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.noticeCard}>
+            <View style={[styles.noticeIcon, notice.mine && styles.noticeIconMine]}>
+              <FontAwesome name={notice.icon} size={30} color={notice.mine ? COLORS.primary : COLORS.textDark} />
+            </View>
+            <Text style={styles.noticeText}>{notice.text}</Text>
+            {showContent && (
+              <View style={styles.noticeItem}>
+                {donation.photo_url ? (
+                  <Image source={{ uri: donation.photo_url }} style={styles.noticeItemImage} />
+                ) : null}
+                <Text style={styles.noticeItemTitle} numberOfLines={2}>{donation.title}</Text>
+              </View>
+            )}
+            <View style={styles.noticeButtons}>
+              {notice.mine && (
+                <Button
+                  title="Ver detalhes da doação"
+                  icon={<FontAwesome name="list-alt" size={16} color="#FFF" />}
+                  onPress={() => router.push({ pathname: '/(app)/transaction', params: { id: String(donation.id) } })}
+                />
+              )}
+              <Button
+                title="Ver outras doações"
+                variant={notice.mine ? 'outline' : undefined}
+                onPress={() => router.push('/home')}
+              />
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.mainContainer}>
@@ -147,11 +216,34 @@ export default function ProductScreen() {
                 <Text style={styles.categoryBadgeText}>{donation.category}</Text>
               </View>
               <View style={[styles.statusBadge, donation.status !== 'available' && styles.statusBadgeReserved]}>
-                <Text style={styles.statusBadgeText}>
-                  {donation.status === 'available' ? 'Disponível' : donation.status === 'reserved' ? 'Reservado' : 'Concluído'}
-                </Text>
+                <Text style={styles.statusBadgeText}>{STATUS_LABEL[donation.status] ?? donation.status}</Text>
               </View>
             </View>
+
+            {isOwner && (donation.status === 'closed' || donation.status === 'cancelled') && (
+              <View style={styles.ownerNotice}>
+                <FontAwesome name="ban" size={14} color={COLORS.textDark} />
+                <Text style={styles.ownerNoticeText}>Você encerrou esta publicação. Ela não aparece mais para outras pessoas.</Text>
+              </View>
+            )}
+            {isOwner && donation.status === 'removed' && (
+              <View style={[styles.ownerNotice, styles.ownerNoticeDanger]}>
+                <FontAwesome name="exclamation-triangle" size={14} color="#C0392B" />
+                <Text style={[styles.ownerNoticeText, { color: '#C0392B' }]}>
+                  Publicação removida por violar as diretrizes do site.{donation.removed_reason ? ` Motivo: ${donation.removed_reason}` : ''}
+                </Text>
+              </View>
+            )}
+            {!isOwner && donation.status === 'reserved' && donation.is_my_transaction && (
+              <TouchableOpacity
+                style={styles.ownerNotice}
+                activeOpacity={0.8}
+                onPress={() => router.push({ pathname: '/(app)/transaction', params: { id: String(donation.id) } })}
+              >
+                <FontAwesome name="truck" size={14} color={COLORS.primary} />
+                <Text style={[styles.ownerNoticeText, { color: COLORS.primary }]}>Esse item está a caminho de você — toque para ver a entrega.</Text>
+              </TouchableOpacity>
+            )}
 
             <SectionTitle title="DESCRIÇÃO" />
             <Text style={styles.descriptionText}>{donation.description}</Text>
@@ -266,4 +358,15 @@ const styles = StyleSheet.create({
   donorInfo: { flex: 1 },
   donorName: { fontSize: 18, fontWeight: 'bold', color: '#000', marginBottom: 4 },
   donorSince: { fontSize: 12, color: COLORS.textLight },
+  ownerNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFF', borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, padding: 12, marginBottom: 8 },
+  ownerNoticeDanger: { borderColor: 'rgba(192,57,43,0.35)', backgroundColor: 'rgba(192,57,43,0.06)' },
+  ownerNoticeText: { flex: 1, fontSize: 14, color: COLORS.textDark, lineHeight: 20 },
+  noticeCard: { width: '100%', maxWidth: 520, alignSelf: 'center', marginTop: 40, padding: 28, gap: 16, alignItems: 'center', backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: COLORS.border },
+  noticeIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.06)' },
+  noticeIconMine: { backgroundColor: 'rgba(18,128,42,0.12)' },
+  noticeText: { fontSize: 20, fontWeight: 'bold', color: '#000', textAlign: 'center' },
+  noticeItem: { flexDirection: 'row', alignItems: 'center', gap: 12, alignSelf: 'stretch', padding: 12, borderRadius: 12, backgroundColor: COLORS.backgroundGray },
+  noticeItemImage: { width: 56, height: 56, borderRadius: 10, backgroundColor: COLORS.border },
+  noticeItemTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: COLORS.textDark },
+  noticeButtons: { alignSelf: 'stretch', gap: 10 },
 });

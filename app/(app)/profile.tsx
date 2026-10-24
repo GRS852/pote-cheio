@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import CancelDonationModal from '../../components/CancelDonationModal';
+import CloseDonationModal from '../../components/CloseDonationModal';
 import InterestedUsersModal from '../../components/InterestedUsersModal';
 import MainHeader from '../../components/MainHeader';
 import ModerationNoticesCard from '../../components/ModerationNoticesCard';
@@ -29,7 +30,7 @@ import {
   InterestedUser,
   cancelDonationRequest,
   confirmDonationRequest,
-  deleteDonationRequest,
+  closeDonationRequest,
   getInterestedUsersRequest,
   getMyDonationsRequest,
   getWishlistRequest,
@@ -52,6 +53,20 @@ function daysUntil(dateStr: string): number {
 
 type TabType = 'Minhas doações' | 'Historia' | 'Favoritos' | 'Comentários';
 const TABS: TabType[] = ['Minhas doações', 'Historia', 'Favoritos', 'Comentários'];
+
+// Tag dos favoritos: Em aberto (ainda não doada), Finalizada (doada para
+// alguém) ou Encerrada (o doador encerrou ou a moderação removeu).
+function favoriteTag(d: Donation): { label: string; color: string; bg: string } {
+  if (d.status === 'completed') {
+    return d.received_by_me
+      ? { label: 'Finalizada · para você', color: '#1E7E34', bg: 'rgba(39,174,96,0.14)' }
+      : { label: 'Finalizada', color: '#1E7E34', bg: 'rgba(39,174,96,0.14)' };
+  }
+  if (d.status === 'available' || d.status === 'reserved') {
+    return { label: 'Em aberto', color: COLORS.secondary, bg: 'rgba(254,108,0,0.12)' };
+  }
+  return { label: 'Encerrada', color: '#555', bg: 'rgba(0,0,0,0.08)' };
+}
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -81,6 +96,7 @@ export default function ProfileScreen() {
   const [unreserveLoadingId, setUnreserveLoadingId] = useState<number | null>(null);
   const [finalizingId, setFinalizingId] = useState<number | null>(null);
   const [cancelDonationId, setCancelDonationId] = useState<number | null>(null);
+  const [closeDonationId, setCloseDonationId] = useState<number | null>(null);
 
   const [ratingSummary, setRatingSummary] = useState<DonorRatingSummary>({ average: null, count: 0 });
   const [feedback, setFeedback] = useState<DonorFeedback[]>([]);
@@ -98,7 +114,7 @@ export default function ProfileScreen() {
   const memberSince = user?.created_at ? new Date(user.created_at).getFullYear().toString() : '';
   const completedCount = myDonations.filter(d => d.status === 'completed').length;
   const reservedCount = myDonations.filter(d => d.status === 'reserved').length;
-  const receivedCount = wishlist.filter(d => d.status === 'completed').length;
+  const receivedCount = wishlist.filter(d => d.status === 'completed' && d.received_by_me).length;
 
   // Load on mount — used in impact metrics, Minhas doações and História
   useEffect(() => {
@@ -216,18 +232,19 @@ export default function ProfileScreen() {
     if (!token || !cancelDonationId) return;
     const donationId = cancelDonationId;
     await cancelDonationRequest(token, donationId, reason);
-    setMyDonations(prev => prev.map(d => d.id === donationId ? { ...d, status: 'cancelled', cancel_reason: reason } : d));
+    // A negociação é cancelada e a doação volta a ficar disponível
+    setMyDonations(prev => prev.map(d => d.id === donationId
+      ? { ...d, status: 'available', cancel_reason: reason, reserved_for_user_id: null, reserved_for_name: null, reserved_until: null }
+      : d));
   }
 
-  async function handleDeleteDonation(donationId: number) {
-    if (!token) return;
-    setActionError('');
-    try {
-      await deleteDonationRequest(token, donationId);
-      setMyDonations(prev => prev.filter(d => d.id !== donationId));
-    } catch {
-      setActionError('Não foi possível excluir a doação.');
-    }
+  // Encerrar publicação: sai do catálogo e de "Minhas doações" (fica no
+  // histórico em "Ver doações"). Erros aparecem no próprio modal.
+  async function handleCloseDonation() {
+    if (!token || !closeDonationId) return;
+    const donationId = closeDonationId;
+    await closeDonationRequest(token, donationId);
+    setMyDonations(prev => prev.filter(d => d.id !== donationId));
   }
 
   async function handleOpenInterestedModal(donationId: number, mode: 'reserve' | 'confirm') {
@@ -308,6 +325,13 @@ export default function ProfileScreen() {
         visible={cancelDonationId != null}
         onClose={() => setCancelDonationId(null)}
         onConfirm={handleCancelDonation}
+      />
+
+      <CloseDonationModal
+        visible={closeDonationId != null}
+        donationTitle={myDonations.find(d => d.id === closeDonationId)?.title}
+        onClose={() => setCloseDonationId(null)}
+        onConfirm={handleCloseDonation}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
@@ -470,9 +494,10 @@ export default function ProfileScreen() {
                             <Text style={[styles.actionChipText, { color: '#C0392B' }]}>Cancelar</Text>
                           </TouchableOpacity>
                         )}
-                        {d.status !== 'cancelled' && (
-                          <TouchableOpacity style={[styles.actionChip, styles.actionChipDanger]} onPress={() => handleDeleteDonation(d.id)} activeOpacity={0.7}>
-                            <FontAwesome name="trash-o" size={13} color="#C0392B" />
+                        {(d.status === 'available' || d.status === 'reserved') && (
+                          <TouchableOpacity style={[styles.actionChip, styles.actionChipDanger, styles.actionChipRow]} onPress={() => setCloseDonationId(d.id)} activeOpacity={0.7}>
+                            <FontAwesome name="ban" size={13} color="#C0392B" />
+                            <Text style={[styles.actionChipText, { color: '#C0392B' }]}>Encerrar</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -519,12 +544,12 @@ export default function ProfileScreen() {
 
                   {/* Doações recebidas */}
                   <Text style={[styles.historySection, { marginTop: 24 }]}>Doações recebidas</Text>
-                  {wishlist.filter(d => d.status === 'completed').length === 0 ? (
+                  {wishlist.filter(d => d.status === 'completed' && d.received_by_me).length === 0 ? (
                     <View style={styles.historyEmpty}>
                       <Text style={styles.emptyStateText}>Nenhuma doação recebida ainda.</Text>
                     </View>
                   ) : (
-                    wishlist.filter(d => d.status === 'completed').map(d => (
+                    wishlist.filter(d => d.status === 'completed' && d.received_by_me).map(d => (
                       <View key={d.id} style={styles.historyItem}>
                         {d.photo_url ? (
                           <Image source={{ uri: d.photo_url }} style={styles.historyImage} />
@@ -559,13 +584,14 @@ export default function ProfileScreen() {
                 </View>
               ) : (
                 <View style={styles.wishlistGrid}>
-                  {wishlist.map(item => (
+                  {wishlist.map(item => {
+                    const tag = favoriteTag(item);
+                    return (
                     <TouchableOpacity
                       key={item.id}
                       style={styles.wishlistCard}
-                      activeOpacity={item.status === 'available' ? 1 : 0.7}
-                      disabled={item.status === 'available'}
-                      onPress={() => router.push({ pathname: '/transaction', params: { id: String(item.id) } })}
+                      activeOpacity={0.7}
+                      onPress={() => router.push({ pathname: '/(app)/product', params: { id: String(item.id) } })}
                     >
                       {item.photo_url ? (
                         <Image source={{ uri: item.photo_url }} style={styles.wishlistImage} resizeMode="cover" />
@@ -577,14 +603,14 @@ export default function ProfileScreen() {
                       <View style={styles.wishlistCardInfo}>
                         <Text style={styles.wishlistCardTitle} numberOfLines={1}>{item.title}</Text>
                         <Text style={styles.wishlistCardCategory}>{item.category}</Text>
-                        {item.status !== 'available' && (
-                          <Text style={styles.wishlistTrackLink}>
-                            {item.status === 'reserved' ? 'Acompanhar pedido' : 'Ver detalhes'}
-                          </Text>
-                        )}
+                        <View style={[styles.wishlistTag, { backgroundColor: tag.bg }]}>
+                          <Text style={[styles.wishlistTagText, { color: tag.color }]}>{tag.label}</Text>
+                        </View>
+                        <Text style={styles.wishlistTrackLink}>Ver detalhes</Text>
                       </View>
                     </TouchableOpacity>
-                  ))}
+                    );
+                  })}
                 </View>
               )
             )}
@@ -715,6 +741,7 @@ const styles = StyleSheet.create({
   donationStatusText: { fontSize: 11, fontWeight: 'bold' },
   donationActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(217,217,217,0.5)' },
   actionChip: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#FAFAFA' },
+  actionChipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionChipText: { fontSize: 12, fontWeight: '600', color: COLORS.textDark },
   actionChipGreen: { borderColor: '#27AE60', backgroundColor: 'rgba(39,174,96,0.08)' },
   actionChipTextGreen: { color: '#27AE60' },
@@ -730,6 +757,8 @@ const styles = StyleSheet.create({
   wishlistCardTitle: { fontSize: 12, fontWeight: 'bold', color: '#000', marginBottom: 2 },
   wishlistCardCategory: { fontSize: 11, color: COLORS.textLight },
   wishlistTrackLink: { fontSize: 11, color: COLORS.primary, fontWeight: '600', marginTop: 4 },
+  wishlistTag: { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, marginTop: 5 },
+  wishlistTagText: { fontSize: 10, fontWeight: '700' },
 
   // Logout
   logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 32, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#C0392B', backgroundColor: '#FFF5F5' },

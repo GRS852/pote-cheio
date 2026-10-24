@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { facebookSignInRequest, getMeRequest, googleSignInRequest, signInRequest, signUpRequest, Usuario } from './authService';
+import { connectSocket, disconnectSocket } from './socketService';
 
 async function saveToken(value: string) {
   if (Platform.OS === 'web') {
@@ -66,6 +67,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     init();
   }, []);
+
+  // Uma única conexão de tempo real enquanto o usuário estiver logado
+  // (mensagens e notificações chegam em qualquer tela, sem F5).
+  useEffect(() => {
+    if (!token) return;
+    connectSocket(token);
+    return () => { disconnectSocket(); };
+  }, [token]);
 
   async function signUp(name: string, email: string, password: string, birthDate: string) {
     const data = await signUpRequest(name, email, password, birthDate);

@@ -24,14 +24,12 @@ import {
   getMessagesRequest,
   getOtherUser,
   hideConversationRequest,
+  lastServerMessageId,
+  mergeMessages,
+  newClientId,
 } from '../../services/conversationService';
-import {
-  connectSocket,
-  joinRoom,
-  offNewMessage,
-  onNewMessage,
-  sendSocketMessage,
-} from '../../services/socketService';
+import { onNewMessage, onReconnect, sendSocketMessage } from '../../services/socketService';
+import { usePolling } from '../../services/usePolling';
 
 type FilterTab = 'Todas' | 'Recebendo' | 'Doando';
 
@@ -97,30 +95,59 @@ export default function MessagesScreen() {
   const [activeTab, setActiveTab] = useState<FilterTab>('Todas');
   const [searchText, setSearchText] = useState('');
   const scrollRef = useRef<ScrollView>(null);
-  const userRef = useRef(user);
-  useEffect(() => { userRef.current = user; }, [user]);
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  const activeConvRef = useRef(activeConvId);
+  useEffect(() => { activeConvRef.current = activeConvId; }, [activeConvId]);
+  const conversationsRef = useRef(conversations);
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
 
-  useEffect(() => {
-    if (!token) return;
-    connectSocket(token);
-    onNewMessage(msg => {
-      if (activeConvId == null) return;
-      if (msg.author_id === userRef.current?.id) return;
-      const newMsg: Message = {
-        id: msg.id,
-        conversation_id: activeConvId,
-        author_id: msg.author_id,
-        content: msg.content,
-        sent_at: msg.sent_at,
-      };
-      setMessages(prev => ({
-        ...prev,
-        [activeConvId]: [...(prev[activeConvId] ?? []), newMsg],
-      }));
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+  function addMessages(convId: number, incoming: Message[]) {
+    if (incoming.length === 0) return;
+    setMessages(prev => {
+      // Conversa ainda não carregada: ao abrir ela busca tudo do servidor
+      if (!prev[convId]) return prev;
+      return { ...prev, [convId]: mergeMessages(prev[convId], incoming) };
     });
-    return () => { offNewMessage(); };
-  }, [token, activeConvId]);
+    if (convId === activeConvRef.current) {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    }
+  }
+
+  function loadConversations() {
+    if (!token) return;
+    getConversationsRequest(token, user?.id)
+      .then(setConversations)
+      .catch(() => {});
+  }
+
+  // Busca só o que chegou depois da última mensagem conhecida da conversa aberta
+  async function fetchNewMessages() {
+    const convId = activeConvRef.current;
+    if (!token || convId == null || !messagesRef.current[convId]) return;
+    try {
+      const after = lastServerMessageId(messagesRef.current[convId]);
+      const msgs = await getMessagesRequest(token, convId, after);
+      addMessages(convId, msgs);
+    } catch {}
+  }
+
+  // Tempo real: o socket (conectado no login) entrega as mensagens das
+  // duas pontas; a confirmação da minha própria troca a mensagem otimista.
+  useEffect(() => {
+    const offMessage = onNewMessage(msg => {
+      if (!conversationsRef.current.some(c => c.id === msg.conversation_id)) {
+        // Conversa nova (ou que estava oculta) — atualiza a lista lateral
+        loadConversations();
+      }
+      addMessages(msg.conversation_id, [msg]);
+    });
+    const offReconnect = onReconnect(() => { fetchNewMessages(); });
+    return () => { offMessage(); offReconnect(); };
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Rede de segurança caso algum evento do socket se perca
+  usePolling(fetchNewMessages, 5000, !!token && activeConvId != null);
 
   useEffect(() => {
     if (!token) return;
@@ -139,13 +166,17 @@ export default function MessagesScreen() {
 
   async function openConversation(convId: number) {
     setActiveConvId(convId);
-    if (messages[convId]) return;
+    activeConvRef.current = convId;
+    if (messagesRef.current[convId]) {
+      fetchNewMessages();
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
+      return;
+    }
     if (!token) return;
     setMsgLoading(true);
     try {
       const msgs = await getMessagesRequest(token, convId);
       setMessages(prev => ({ ...prev, [convId]: msgs }));
-      joinRoom(convId);
     } finally {
       setMsgLoading(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
@@ -164,18 +195,20 @@ export default function MessagesScreen() {
   function handleSend() {
     const text = inputText.trim();
     if (!text || activeConvId == null || !user) return;
+    const clientId = newClientId();
     const optimistic: Message = {
-      id: Date.now(),
+      id: -Date.now(),
       conversation_id: activeConvId,
       author_id: user.id,
       content: text,
       sent_at: new Date().toISOString(),
+      client_id: clientId,
     };
     setMessages(prev => ({
       ...prev,
       [activeConvId]: [...(prev[activeConvId] ?? []), optimistic],
     }));
-    sendSocketMessage(activeConvId, text);
+    sendSocketMessage(activeConvId, text, clientId);
     setInputText('');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }

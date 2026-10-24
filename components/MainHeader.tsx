@@ -22,6 +22,8 @@ import {
   markAllReadRequest,
   markNotificationReadRequest,
 } from '../services/notificationService';
+import { onNewNotification } from '../services/socketService';
+import { usePolling } from '../services/usePolling';
 
 function timeAgo(dateStr: string): string {
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
@@ -65,12 +67,33 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
 
   const userInitial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : '?';
 
-  useEffect(() => {
+  function refreshNotifications() {
     if (!token) return;
     getNotificationsRequest(token)
-      .then(res => setUnreadCount(res.unread))
+      .then(res => {
+        setUnreadCount(res.unread);
+        if (showNotifPanel) setNotifications(res.notifications);
+      })
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    refreshNotifications();
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tempo real: notificação nova chega pelo socket e já aparece no sino
+  useEffect(() => {
+    if (!token) return;
+    return onNewNotification(notif => {
+      setUnreadCount(prev => prev + 1);
+      setNotifications(prev =>
+        prev.some(n => n.id === notif.id) ? prev : [{ ...notif, read: false }, ...prev]
+      );
+    });
   }, [token]);
+
+  // Rede de segurança caso algum evento do socket se perca
+  usePolling(refreshNotifications, 20000, !!token);
 
   function handleBellPress() {
     if (!token) return;
@@ -191,11 +214,21 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
         {!isMobile && (
           <>
             <TouchableOpacity onPress={() => router.push('/home')}>
-              <Text style={styles.linkVerde}>Doações</Text>
+              <Text style={styles.linkVerde}>Receber doações</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/(app)/donate')}>
               <Text style={styles.linkVerde}>Quero doar</Text>
             </TouchableOpacity>
+            {user && (
+              <>
+                <TouchableOpacity onPress={() => router.push('/(app)/donation-history')}>
+                  <Text style={styles.linkVerde}>Ver doações</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('/(app)/profile')}>
+                  <Text style={styles.linkVerde}>Meu perfil</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </>
         )}
 
@@ -273,10 +306,18 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
 
             <TouchableOpacity
               style={styles.userMenuItem}
-              onPress={() => { setShowUserMenu(false); router.push('/(app)/donation-status'); }}
+              onPress={() => { setShowUserMenu(false); router.push('/(app)/donation-history'); }}
+            >
+              <FontAwesome name="list-ul" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
+              <Text style={styles.userMenuItemText}>Ver doações</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.userMenuItem}
+              onPress={() => { setShowUserMenu(false); router.push('/(app)/deliveries'); }}
             >
               <FontAwesome name="truck" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
-              <Text style={styles.userMenuItemText}>Ver status de doação</Text>
+              <Text style={styles.userMenuItemText}>Ver entregas</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -292,7 +333,7 @@ export default function MainHeader({ searchValue, onSearchChange, showSearch = t
               onPress={() => { setShowUserMenu(false); router.push('/(app)/messages'); }}
             >
               <FontAwesome name="comment" size={18} color={COLORS.primary} style={styles.userMenuIcon} />
-              <Text style={styles.userMenuItemText}>Minhas Mensagens</Text>
+              <Text style={styles.userMenuItemText}>Minhas mensagens</Text>
             </TouchableOpacity>
 
             <View style={styles.userMenuDivider} />

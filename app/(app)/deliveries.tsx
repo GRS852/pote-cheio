@@ -7,43 +7,26 @@ import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacit
 import MainHeader from '../../components/MainHeader';
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../services/AuthContext';
-import { DonationStatusItem, DonationStatusStage, getDonationStatusRequest } from '../../services/donationService';
+import { DeliveryItem, getDeliveriesRequest } from '../../services/donationService';
 
-const TABS: { key: DonationStatusStage; label: string }[] = [
-  { key: 'pending', label: 'Pendentes' },
-  { key: 'accepted', label: 'Aceitas' },
-  { key: 'shipped', label: 'Em encaminhamento' },
+type DeliveryTab = 'donor' | 'recipient';
+
+const TABS: { key: DeliveryTab; label: string }[] = [
+  { key: 'donor', label: 'Enviando' },
+  { key: 'recipient', label: 'Recebendo' },
 ];
 
-const EMPTY_TEXT: Record<DonationStatusStage, string> = {
-  pending: 'Nenhuma doação aguardando decisão.',
-  accepted: 'Nenhuma doação aceita aguardando entrega.',
-  shipped: 'Nenhuma doação em encaminhamento.',
+const EMPTY_TEXT: Record<DeliveryTab, string> = {
+  donor: 'Você não está enviando nenhuma doação no momento.',
+  recipient: 'Você não está recebendo nenhuma doação no momento.',
 };
 
-function daysUntil(dateStr: string): number {
-  const diffMs = new Date(dateStr).getTime() - Date.now();
-  return Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
-}
-
-function describe(item: DonationStatusItem): string {
+function describe(item: DeliveryItem): string {
   const other = item.other_user_name ?? 'a outra pessoa';
-  const expires = item.reserved_until ? ` · expira em ${daysUntil(item.reserved_until)} dia(s)` : '';
-
-  if (item.stage === 'pending') {
-    if (item.role === 'donor') {
-      if (item.other_user_id) return `Reservado para ${other}${expires}`;
-      const count = item.interested_count ?? 0;
-      return `${count} pessoa${count === 1 ? '' : 's'} interessada${count === 1 ? '' : 's'} aguardando sua escolha`;
-    }
-    return item.reserved_for_me
-      ? `${other} reservou para você${expires}`
-      : `Aguardando ${other} escolher quem vai receber`;
-  }
 
   if (item.stage === 'accepted') {
     return item.role === 'donor'
-      ? `Combine a entrega com ${other} pelo chat`
+      ? `Aceita — combine a entrega com ${other} pelo chat`
       : `${other} aceitou seu pedido — combine a entrega pelo chat`;
   }
 
@@ -52,53 +35,47 @@ function describe(item: DonationStatusItem): string {
     : `${other} enviou — confirme quando receber`;
 }
 
-export default function DonationStatusScreen() {
+export default function DeliveriesScreen() {
   const router = useRouter();
   const { token } = useAuth();
-  const [items, setItems] = useState<DonationStatusItem[]>([]);
+  const [items, setItems] = useState<DeliveryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<DonationStatusStage>('pending');
+  const [activeTab, setActiveTab] = useState<DeliveryTab>('donor');
 
   useEffect(() => {
     if (!token) return;
     setLoading(true);
     setError('');
-    getDonationStatusRequest(token)
+    getDeliveriesRequest(token)
       .then(setItems)
-      .catch(err => setError(err instanceof Error ? err.message : 'Não foi possível carregar o status das doações.'))
+      .catch(err => setError(err instanceof Error ? err.message : 'Não foi possível carregar as entregas.'))
       .finally(() => setLoading(false));
   }, [token]);
 
-  function handleOpen(item: DonationStatusItem) {
-    if (item.stage !== 'pending') {
-      router.push({ pathname: '/(app)/transaction', params: { id: String(item.donation_id) } });
-    } else if (item.role === 'donor') {
-      router.push('/(app)/profile');
-    } else {
-      router.push({ pathname: '/(app)/product', params: { id: String(item.donation_id) } });
-    }
+  function handleOpen(item: DeliveryItem) {
+    router.push({ pathname: '/(app)/transaction', params: { id: String(item.donation_id) } });
   }
 
-  const visible = items.filter(i => i.stage === activeTab);
+  const visible = items.filter(i => i.role === activeTab);
 
   return (
     <View style={styles.mainContainer}>
-      <Head><title>Status das doações | Pote Cheio</title></Head>
+      <Head><title>Entregas | Pote Cheio</title></Head>
       <MainHeader showSearch={false} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.contentWrapper}>
           <Text style={styles.pageTitle}>
-            Status das <Text style={{ color: COLORS.secondary }}>doações</Text>
+            Minhas <Text style={{ color: COLORS.secondary }}>entregas</Text>
           </Text>
           <Text style={styles.pageSubtitle}>
-            Acompanhe o que você está doando e o que vai receber.
+            Acompanhe a entrega das doações que você está enviando e das que está recebendo.
           </Text>
 
           <View style={styles.tabsContainer}>
             {TABS.map(tab => {
-              const count = items.filter(i => i.stage === tab.key).length;
+              const count = items.filter(i => i.role === tab.key).length;
               const active = activeTab === tab.key;
               return (
                 <TouchableOpacity
@@ -140,9 +117,9 @@ export default function DonationStatusScreen() {
                   </View>
                 )}
                 <View style={styles.cardInfo}>
-                  <View style={[styles.roleBadge, item.role === 'donor' ? styles.roleDonor : styles.roleRecipient]}>
-                    <Text style={[styles.roleText, item.role === 'donor' ? styles.roleDonorText : styles.roleRecipientText]}>
-                      {item.role === 'donor' ? 'Você está doando' : 'Você vai receber'}
+                  <View style={[styles.roleBadge, item.stage === 'shipped' ? styles.roleRecipient : styles.roleDonor]}>
+                    <Text style={[styles.roleText, item.stage === 'shipped' ? styles.roleRecipientText : styles.roleDonorText]}>
+                      {item.stage === 'shipped' ? 'A caminho' : 'Aguardando envio'}
                     </Text>
                   </View>
                   <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>

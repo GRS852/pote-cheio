@@ -4,8 +4,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { useAuth } from '../services/AuthContext';
-import { Conversation, Message, getConversationsRequest, getMessagesRequest, getOtherUser, hideConversationRequest } from '../services/conversationService';
-import { connectSocket, joinRoom, offNewMessage, onNewMessage, sendSocketMessage } from '../services/socketService';
+import { Conversation, Message, getConversationsRequest, getMessagesRequest, getOtherUser, hideConversationRequest, lastServerMessageId, mergeMessages, newClientId } from '../services/conversationService';
+import { onNewMessage, onReconnect, sendSocketMessage } from '../services/socketService';
+import { usePolling } from '../services/usePolling';
 
 interface ChatWidgetProps {
   forceOpenConversationId?: number | null;
@@ -40,34 +41,40 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
   const [msgLoading, setMsgLoading] = useState(false);
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<ScrollView>(null);
-  const userRef = useRef<typeof user>(null);
-  useEffect(() => { userRef.current = user; }, [user]);
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  const activeConvRef = useRef(activeConvId);
+  useEffect(() => { activeConvRef.current = activeConvId; }, [activeConvId]);
 
-  // Connect socket when token is available
-  useEffect(() => {
-    if (!token) return;
-    const sock = connectSocket(token);
-
-    onNewMessage(msg => {
-      if (activeConvId == null) return;
-      // skip own messages — already added optimistically in handleSend
-      if (msg.author_id === userRef.current?.id) return;
-      const newMsg: Message = {
-        id: msg.id,
-        conversation_id: activeConvId,
-        author_id: msg.author_id,
-        content: msg.content,
-        sent_at: msg.sent_at,
-      };
-      setMessages(prev => ({
-        ...prev,
-        [activeConvId]: [...(prev[activeConvId] ?? []), newMsg],
-      }));
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+  function addMessages(convId: number, incoming: Message[]) {
+    if (incoming.length === 0) return;
+    setMessages(prev => {
+      if (!prev[convId]) return prev;
+      return { ...prev, [convId]: mergeMessages(prev[convId], incoming) };
     });
+    if (convId === activeConvRef.current) {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    }
+  }
 
-    return () => { offNewMessage(); };
-  }, [token, activeConvId]);
+  async function fetchNewMessages() {
+    const convId = activeConvRef.current;
+    if (!token || convId == null || !messagesRef.current[convId]) return;
+    try {
+      const msgs = await getMessagesRequest(token, convId, lastServerMessageId(messagesRef.current[convId]));
+      addMessages(convId, msgs);
+    } catch {}
+  }
+
+  // Tempo real pelo socket global (conectado no login) + reconexão
+  useEffect(() => {
+    const offMessage = onNewMessage(msg => addMessages(msg.conversation_id, [msg]));
+    const offReconnect = onReconnect(() => { fetchNewMessages(); });
+    return () => { offMessage(); offReconnect(); };
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Rede de segurança enquanto o chat estiver aberto numa conversa
+  usePolling(fetchNewMessages, 5000, !!token && isOpen && activeConvId != null);
 
   // Load conversations when widget opens
   useEffect(() => {
@@ -91,13 +98,16 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
 
   async function openConversation(convId: number, force = false) {
     setActiveConvId(convId);
-    if (!force && messages[convId]) return; // use cache only when not forced
+    activeConvRef.current = convId;
+    if (!force && messagesRef.current[convId]) { // use cache only when not forced
+      fetchNewMessages();
+      return;
+    }
     if (!token) return;
     setMsgLoading(true);
     try {
       const msgs = await getMessagesRequest(token, convId);
       setMessages(prev => ({ ...prev, [convId]: msgs }));
-      joinRoom(convId);
     } finally {
       setMsgLoading(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
@@ -129,15 +139,17 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
     if (!text || activeConvId == null || !user) return;
 
     // Optimistic update
+    const clientId = newClientId();
     const optimistic: Message = {
-      id: Date.now(),
+      id: -Date.now(),
       conversation_id: activeConvId,
       author_id: user.id,
       content: text,
       sent_at: new Date().toISOString(),
+      client_id: clientId,
     };
     setMessages(prev => ({ ...prev, [activeConvId]: [...(prev[activeConvId] ?? []), optimistic] }));
-    sendSocketMessage(activeConvId, text);
+    sendSocketMessage(activeConvId, text, clientId);
     setInputText('');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }
