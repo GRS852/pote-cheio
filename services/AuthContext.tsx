@@ -1,9 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../constants/theme';
-import { AccountBannedError, AccountDisabledError, facebookSignInRequest, getMeRequest, googleSignInRequest, signInRequest, signUpRequest, Usuario } from './authService';
-import { connectSocket, disconnectSocket } from './socketService';
+import { AccountBannedError, AccountDisabledError, NetworkError, facebookSignInRequest, getMeRequest, googleSignInRequest, signInRequest, signUpRequest, Usuario } from './authService';
+import { connectSocket, disconnectSocket, onServerDisconnect } from './socketService';
+import { usePolling } from './usePolling';
 
 async function saveToken(value: string) {
   if (Platform.OS === 'web') {
@@ -64,25 +65,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Usuario | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  // Token guardado que não pôde ser conferido porque a API estava fora do ar
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const tokenRef = useRef<string | null>(null);
+  useEffect(() => { tokenRef.current = token; }, [token]);
+
+  // Restaura a sessão do token guardado. Só apaga o token se a API disser que
+  // ele é inválido ou que a conta está bloqueada; em erro de rede (API fora
+  // do ar) mantém o token e tenta de novo depois, sem deslogar a pessoa.
+  async function restoreSession(stored: string) {
+    try {
+      const usuario = await getMeRequest(stored);
+      setPendingToken(null);
+      setToken(stored);
+      setUser(usuario);
+      setIsAuthenticated(true);
+    } catch (err) {
+      if (err instanceof NetworkError) {
+        setPendingToken(stored);
+        return;
+      }
+      setPendingToken(null);
+      await removeToken();
+      setSessionNotice(sessionEndedMessage(err));
+    }
+  }
 
   useEffect(() => {
     async function init() {
       const stored = await loadStoredToken();
-      if (stored) {
-        try {
-          const usuario = await getMeRequest(stored);
-          setToken(stored);
-          setUser(usuario);
-          setIsAuthenticated(true);
-        } catch (err) {
-          await removeToken();
-          setSessionNotice(sessionEndedMessage(err));
-        }
-      }
+      if (stored) await restoreSession(stored);
       setIsLoading(false);
     }
     init();
   }, []);
+
+  // API voltou? Tenta restaurar a sessão guardada a cada 10s
+  usePolling(() => { if (pendingToken) restoreSession(pendingToken); }, 10000, !!pendingToken);
+
+  // Conta banida/desativada durante o uso: confere a cada 60s e, na hora,
+  // quando o servidor derruba a conexão em tempo real (ação do admin)
+  usePolling(() => { refreshUser(); }, 60000, !!token);
+  useEffect(() => onServerDisconnect(() => { refreshUser(); }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Uma única conexão de tempo real enquanto o usuário estiver logado
   // (mensagens e notificações chegam em qualquer tela, sem F5).
@@ -172,9 +196,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function refreshUser() {
-    if (!token) return;
+    const current = tokenRef.current;
+    if (!current) return;
     try {
-      const updated = await getMeRequest(token);
+      const updated = await getMeRequest(current);
       setUser(updated);
     } catch (err) {
       const notice = sessionEndedMessage(err);

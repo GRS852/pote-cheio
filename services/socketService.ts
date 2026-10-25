@@ -35,6 +35,7 @@ export interface SocketNotification {
 const messageListeners = new Set<(msg: SocketMessage) => void>();
 const notificationListeners = new Set<(notif: SocketNotification) => void>();
 const reconnectListeners = new Set<() => void>();
+const serverDisconnectListeners = new Set<() => void>();
 
 // Conectado uma única vez no login (AuthContext). Tenta websocket e cai pra
 // long-polling quando a rede/proxy bloqueia websocket.
@@ -56,6 +57,10 @@ export function connectSocket(token: string): Socket {
   socket.on('new_notification', (notif: SocketNotification) => notificationListeners.forEach(cb => cb(notif)));
   // Ao reconectar, as telas buscam o que chegou enquanto a conexão estava caída
   socket.io.on('reconnect', () => reconnectListeners.forEach(cb => cb()));
+  // O servidor derrubou a conexão ou recusou o login do socket (ex.: conta
+  // banida/desativada pelo admin): o app confere a sessão na hora
+  socket.on('disconnect', reason => { if (reason === 'io server disconnect') serverDisconnectListeners.forEach(cb => cb()); });
+  socket.on('connect_error', err => { if (/Account/.test(err.message)) serverDisconnectListeners.forEach(cb => cb()); });
 
   return socket;
 }
@@ -83,6 +88,11 @@ export function onNewMessage(cb: (msg: SocketMessage) => void): () => void {
 export function onNewNotification(cb: (notif: SocketNotification) => void): () => void {
   notificationListeners.add(cb);
   return () => { notificationListeners.delete(cb); };
+}
+
+export function onServerDisconnect(cb: () => void): () => void {
+  serverDisconnectListeners.add(cb);
+  return () => { serverDisconnectListeners.delete(cb); };
 }
 
 export function onReconnect(cb: () => void): () => void {
