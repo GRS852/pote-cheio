@@ -1,8 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
-import { createContext, useContext, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
-import { facebookSignInRequest, getMeRequest, googleSignInRequest, signInRequest, signUpRequest, Usuario } from './authService';
-import { connectSocket, disconnectSocket } from './socketService';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { COLORS } from '../constants/theme';
+import { AccountBannedError, AccountDisabledError, NetworkError, facebookSignInRequest, getMeRequest, googleSignInRequest, signInRequest, signUpRequest, Usuario } from './authService';
+import { connectSocket, disconnectSocket, onServerDisconnect } from './socketService';
+import { usePolling } from './usePolling';
 
 async function saveToken(value: string) {
   if (Platform.OS === 'web') {
@@ -44,29 +46,67 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Motivo para mostrar quando a sessão é encerrada porque a conta foi
+// desativada ou banida depois do login (antes o site só deslogava)
+function sessionEndedMessage(err: unknown): string | null {
+  if (err instanceof AccountDisabledError) {
+    return 'Esta conta foi desativada. Entre em contato com o suporte se acredita que isso é um engano.';
+  }
+  if (err instanceof AccountBannedError) {
+    const until = err.bannedUntil ? new Date(err.bannedUntil).toLocaleString('pt-BR') : null;
+    return until ? `Sua conta está temporariamente banida até ${until}.` : 'Sua conta está temporariamente banida.';
+  }
+  return null;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<Usuario | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  // Token guardado que não pôde ser conferido porque a API estava fora do ar
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const tokenRef = useRef<string | null>(null);
+  useEffect(() => { tokenRef.current = token; }, [token]);
+
+  // Restaura a sessão do token guardado. Só apaga o token se a API disser que
+  // ele é inválido ou que a conta está bloqueada; em erro de rede (API fora
+  // do ar) mantém o token e tenta de novo depois, sem deslogar a pessoa.
+  async function restoreSession(stored: string) {
+    try {
+      const usuario = await getMeRequest(stored);
+      setPendingToken(null);
+      setToken(stored);
+      setUser(usuario);
+      setIsAuthenticated(true);
+    } catch (err) {
+      if (err instanceof NetworkError) {
+        setPendingToken(stored);
+        return;
+      }
+      setPendingToken(null);
+      await removeToken();
+      setSessionNotice(sessionEndedMessage(err));
+    }
+  }
 
   useEffect(() => {
     async function init() {
       const stored = await loadStoredToken();
-      if (stored) {
-        try {
-          const usuario = await getMeRequest(stored);
-          setToken(stored);
-          setUser(usuario);
-          setIsAuthenticated(true);
-        } catch {
-          await removeToken();
-        }
-      }
+      if (stored) await restoreSession(stored);
       setIsLoading(false);
     }
     init();
   }, []);
+
+  // API voltou? Tenta restaurar a sessão guardada a cada 10s
+  usePolling(() => { if (pendingToken) restoreSession(pendingToken); }, 10000, !!pendingToken);
+
+  // Conta banida/desativada durante o uso: confere a cada 60s e, na hora,
+  // quando o servidor derruba a conexão em tempo real (ação do admin)
+  usePolling(() => { refreshUser(); }, 60000, !!token);
+  useEffect(() => onServerDisconnect(() => { refreshUser(); }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Uma única conexão de tempo real enquanto o usuário estiver logado
   // (mensagens e notificações chegam em qualquer tela, sem F5).
@@ -156,11 +196,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function refreshUser() {
-    if (!token) return;
+    const current = tokenRef.current;
+    if (!current) return;
     try {
-      const updated = await getMeRequest(token);
+      const updated = await getMeRequest(current);
       setUser(updated);
-    } catch {}
+    } catch (err) {
+      const notice = sessionEndedMessage(err);
+      if (notice) {
+        await signOut();
+        setSessionNotice(notice);
+      }
+    }
   }
 
   function updateUserLocally(partial: Partial<Usuario>) {
@@ -170,6 +217,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{ isAuthenticated, isLoading, user, token, signIn, signUp, signInWithGoogle, signInWithFacebook, signOut, refreshUser, updateUserLocally }}>
       {children}
+      <Modal visible={sessionNotice != null} transparent animationType="fade" onRequestClose={() => setSessionNotice(null)}>
+        <View style={styles.overlay}>
+          <View style={styles.box}>
+            <Text style={styles.title}>Sessão encerrada</Text>
+            <Text style={styles.message}>{sessionNotice}</Text>
+            <TouchableOpacity style={styles.button} onPress={() => setSessionNotice(null)} activeOpacity={0.8}>
+              <Text style={styles.buttonText}>Entendi</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </AuthContext.Provider>
   );
 }
@@ -180,3 +238,12 @@ export function useAuth() {
   if (!context) throw new Error('useAuth deve ser usado dentro de AuthProvider');
   return context;
 }
+
+const styles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  box: { width: '100%', maxWidth: 400, backgroundColor: '#FFF', borderRadius: 12, padding: 22 },
+  title: { fontSize: 18, fontWeight: 'bold', color: '#000', marginBottom: 10 },
+  message: { fontSize: 15, color: COLORS.textDark, lineHeight: 21 },
+  button: { marginTop: 18, backgroundColor: COLORS.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  buttonText: { color: '#FFF', fontWeight: 'bold', fontSize: 15 },
+});

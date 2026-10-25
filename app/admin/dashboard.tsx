@@ -202,6 +202,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundGray },
   header: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 10,
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -212,7 +214,7 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#000' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 14 },
   accountsLink: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   accountsLinkText: { fontSize: 13, color: COLORS.textDark, fontWeight: '600' },
   adminName: { fontSize: 13, color: COLORS.textDark },

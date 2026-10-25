@@ -6,8 +6,8 @@ import { COLORS } from '../constants/theme';
 import { TopicDivider, TopicFilterBar, filterByTopic, getTopics } from './ChatTopics';
 import ClearConversationModal from './ClearConversationModal';
 import { useAuth } from '../services/AuthContext';
-import { Conversation, Message, getConversationsRequest, getMessagesRequest, getOtherUser, hideConversationRequest, lastServerMessageId, mergeMessages, newClientId } from '../services/conversationService';
-import { onNewMessage, onReconnect, sendSocketMessage } from '../services/socketService';
+import { Conversation, Message, getConversationsRequest, getMessagesRequest, getOtherUser, hideConversationRequest, lastServerMessageId, mergeMessages, newClientId, sendMessageRequest } from '../services/conversationService';
+import { onNewMessage, onReconnect } from '../services/socketService';
 import { usePolling } from '../services/usePolling';
 
 interface ChatWidgetProps {
@@ -167,7 +167,16 @@ export default function ChatWidget({ forceOpenConversationId, forceOpen, onClose
       donation_id: selectedTopic,
     };
     setMessages(prev => ({ ...prev, [activeConvId]: [...(prev[activeConvId] ?? []), optimistic] }));
-    sendSocketMessage(activeConvId, text, clientId, selectedTopic);
+    const convId = activeConvId;
+    if (token) {
+      sendMessageRequest(token, convId, text, clientId, selectedTopic)
+        .then(msg => addMessages(convId, [msg]))
+        .catch(() => {
+          // Não foi enviada: tira a mensagem provisória e devolve o texto
+          setMessages(prev => ({ ...prev, [convId]: (prev[convId] ?? []).filter(m => m.client_id !== clientId) }));
+          setInputText(current => current || text);
+        });
+    }
     setInputText('');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }

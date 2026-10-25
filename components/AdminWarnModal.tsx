@@ -10,13 +10,13 @@ interface AdminWarnModalProps {
 }
 
 export default function AdminWarnModal({ visible, onClose, onConfirm }: AdminWarnModalProps) {
-  const [banDays, setBanDays] = useState('3');
+  const [banDays, setBanDays] = useState('0');
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   function handleClose() {
-    setBanDays('3');
+    setBanDays('0');
     setReason('');
     setError('');
     onClose();
@@ -51,13 +51,14 @@ export default function AdminWarnModal({ visible, onClose, onConfirm }: AdminWar
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Duração do banimento temporário (em dias)</Text>
+          {/* Começa em 0 (só advertência): antes vinha 3 e o admin podia banir sem perceber */}
+          <Text style={styles.label}>Duração do banimento temporário (em dias, 0 = só advertência)</Text>
           <TextInput
             style={styles.input}
             value={banDays}
             onChangeText={setBanDays}
             keyboardType="number-pad"
-            placeholder="Ex: 3"
+            placeholder="0"
           />
 
           <Text style={styles.label}>Motivo (opcional, fica no histórico)</Text>

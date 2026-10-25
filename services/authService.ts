@@ -247,6 +247,14 @@ export async function getMeRequest(token: string): Promise<Usuario> {
     throw new NetworkError();
   }
 
+  // Conta desativada ou banida depois do login: a API diz o motivo
+  if (response.status === 403) {
+    const body = await response.json().catch(() => ({}));
+    if (body?.error === 'Account disabled') throw new AccountDisabledError();
+    if (body?.error === 'Account temporarily banned') throw new AccountBannedError(body.banned_until);
+    throw new AuthError();
+  }
+  if (response.status === 401) throw new AuthError();
   if (!response.ok) throw new NetworkError();
 
   const data = await response.json();
