@@ -41,6 +41,14 @@ export class AccountBannedError extends Error {
   }
 }
 
+// Conta criada pelo Google, ainda sem senha: tem que entrar pelo botão do Google
+export class GoogleAccountError extends Error {
+  constructor() {
+    super('Esta conta foi criada com o Google. Use o botão "Entrar com Google" ou crie uma senha em "Esqueci minha senha".');
+    this.name = 'GoogleAccountError';
+  }
+}
+
 export class ConflictError extends Error {
   constructor(message = 'Email já cadastrado') {
     super(message);
@@ -73,7 +81,11 @@ export async function signInRequest(email: string, password: string) {
     if (body?.error === 'Account temporarily banned') throw new AccountBannedError(body.banned_until);
     throw new AuthError();
   }
-  if (response.status === 401) throw new AuthError();
+  if (response.status === 401) {
+    const body = await response.json().catch(() => ({}));
+    if (body?.error === 'Google account') throw new GoogleAccountError();
+    throw new AuthError();
+  }
   if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
 
   return response.json();
@@ -125,25 +137,12 @@ export async function googleSignInRequest(idToken: string) {
     throw new NetworkError();
   }
 
-  if (response.status === 401 || response.status === 403) throw new AuthError('Não foi possível validar sua conta Google.');
-  if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
-
-  return response.json();
-}
-
-export async function facebookSignInRequest(accessToken: string) {
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}/auth/facebook`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: accessToken }),
-    });
-  } catch {
-    throw new NetworkError();
+  if (response.status === 403) {
+    const body = await response.json().catch(() => ({}));
+    if (body?.error === 'Account disabled') throw new AccountDisabledError();
+    if (body?.error === 'Account temporarily banned') throw new AccountBannedError(body.banned_until);
   }
-
-  if (response.status === 401 || response.status === 403) throw new AuthError('Não foi possível validar sua conta Facebook.');
+  if (response.status === 401 || response.status === 403) throw new AuthError('Não foi possível validar sua conta Google.');
   if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
 
   return response.json();
@@ -247,6 +246,14 @@ export async function getMeRequest(token: string): Promise<Usuario> {
     throw new NetworkError();
   }
 
+  // Conta desativada ou banida depois do login: a API diz o motivo
+  if (response.status === 403) {
+    const body = await response.json().catch(() => ({}));
+    if (body?.error === 'Account disabled') throw new AccountDisabledError();
+    if (body?.error === 'Account temporarily banned') throw new AccountBannedError(body.banned_until);
+    throw new AuthError();
+  }
+  if (response.status === 401) throw new AuthError();
   if (!response.ok) throw new NetworkError();
 
   const data = await response.json();

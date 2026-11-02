@@ -157,6 +157,28 @@ export async function getMessagesRequest(token: string, conversationId: number, 
   return data.messages;
 }
 
+/**
+ * Envia uma mensagem por HTTP (não depende do socket). A API grava e entrega
+ * em tempo real para os dois; a resposta já traz a mensagem confirmada.
+ * donationId = assunto da conversa (sem ele, a API usa o mais recente).
+ */
+export async function sendMessageRequest(
+  token: string,
+  conversationId: number,
+  content: string,
+  clientId: string,
+  donationId: number | null
+): Promise<Message> {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ content, client_id: clientId, donation_id: donationId }),
+  });
+  if (!response.ok) throw new Error('Erro ao enviar mensagem');
+  const data = await response.json();
+  return data.message;
+}
+
 export async function hideConversationRequest(token: string, conversationId: number): Promise<void> {
   const response = await fetch(`${API_URL}/conversations/${conversationId}/hide`, {
     method: 'PATCH',

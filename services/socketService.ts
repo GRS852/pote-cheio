@@ -35,6 +35,7 @@ export interface SocketNotification {
 const messageListeners = new Set<(msg: SocketMessage) => void>();
 const notificationListeners = new Set<(notif: SocketNotification) => void>();
 const reconnectListeners = new Set<() => void>();
+const serverDisconnectListeners = new Set<() => void>();
 
 // Conectado uma única vez no login (AuthContext). Tenta websocket e cai pra
 // long-polling quando a rede/proxy bloqueia websocket.
@@ -46,6 +47,8 @@ export function connectSocket(token: string): Socket {
   socket = io(API_URL, {
     auth: { token },
     transports: ['websocket', 'polling'],
+    // Sem isto o cliente não troca para long-polling quando a rede bloqueia WebSocket
+    tryAllTransports: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
   });
@@ -54,6 +57,10 @@ export function connectSocket(token: string): Socket {
   socket.on('new_notification', (notif: SocketNotification) => notificationListeners.forEach(cb => cb(notif)));
   // Ao reconectar, as telas buscam o que chegou enquanto a conexão estava caída
   socket.io.on('reconnect', () => reconnectListeners.forEach(cb => cb()));
+  // O servidor derrubou a conexão ou recusou o login do socket (ex.: conta
+  // banida/desativada pelo admin): o app confere a sessão na hora
+  socket.on('disconnect', reason => { if (reason === 'io server disconnect') serverDisconnectListeners.forEach(cb => cb()); });
+  socket.on('connect_error', err => { if (/Account/.test(err.message)) serverDisconnectListeners.forEach(cb => cb()); });
 
   return socket;
 }
@@ -72,12 +79,6 @@ export function joinRoom(conversationId: number): void {
   socket?.emit('join_room', { conversation_id: conversationId });
 }
 
-// donationId = assunto da conversa a que a mensagem pertence (sem ele, o
-// servidor usa o assunto mais recente)
-export function sendSocketMessage(conversationId: number, content: string, clientId?: string, donationId?: number | null): void {
-  socket?.emit('send_message', { conversation_id: conversationId, content, client_id: clientId, donation_id: donationId ?? null });
-}
-
 // Os "on" devolvem a função que remove o listener (usar no cleanup do useEffect)
 export function onNewMessage(cb: (msg: SocketMessage) => void): () => void {
   messageListeners.add(cb);
@@ -87,6 +88,11 @@ export function onNewMessage(cb: (msg: SocketMessage) => void): () => void {
 export function onNewNotification(cb: (notif: SocketNotification) => void): () => void {
   notificationListeners.add(cb);
   return () => { notificationListeners.delete(cb); };
+}
+
+export function onServerDisconnect(cb: () => void): () => void {
+  serverDisconnectListeners.add(cb);
+  return () => { serverDisconnectListeners.delete(cb); };
 }
 
 export function onReconnect(cb: () => void): () => void {
