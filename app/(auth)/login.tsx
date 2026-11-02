@@ -11,42 +11,42 @@ import AuthHeader from '../../components/AuthHeader';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { COLORS } from '../../constants/theme';
-import { AccountBannedError, AccountDisabledError, AuthError, NetworkError } from '../../services/authService';
+import { AccountBannedError, AccountDisabledError, AuthError, GoogleAccountError, NetworkError } from '../../services/authService';
 import { useAuth } from '../../services/AuthContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB ?? '';
-const FACEBOOK_APP_ID = process.env.EXPO_PUBLIC_FACEBOOK_APP_ID ?? '';
+// ID do cliente OAuth do Google (público). Pode ser trocado pela variável de build.
+const GOOGLE_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '172922092574-mq3dutbto5dlqjummop19p57g70j54ab.apps.googleusercontent.com';
 
-const facebookDiscovery = {
-  authorizationEndpoint: 'https://www.facebook.com/v19.0/dialog/oauth',
-};
+// Mensagem de erro do login (senha ou Google) para a pessoa
+function loginErrorMessage(err: unknown, authFallback: string): string {
+  if (err instanceof NetworkError) return 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+  if (err instanceof AccountDisabledError) return 'Esta conta foi desativada. Entre em contato com o suporte se acredita que isso é um engano.';
+  if (err instanceof AccountBannedError) return `Sua conta está temporariamente banida até ${new Date(err.bannedUntil).toLocaleString('pt-BR')}.`;
+  if (err instanceof GoogleAccountError) return err.message;
+  if (err instanceof AuthError) return authFallback;
+  return err instanceof Error ? err.message : String(err);
+}
 
 export default function LoginScreen() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
-  const { signIn, signInWithGoogle, signInWithFacebook } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
 
   const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_CLIENT_ID,
     responseType: AuthSession.ResponseType.IdToken,
     scopes: ['openid', 'profile', 'email'],
+    // O Google devolve o pop-up para /login, que é onde maybeCompleteAuthSession()
+    // roda e entrega o token para a janela principal (cadastrar no Google Console)
+    redirectUri: AuthSession.makeRedirectUri({ path: 'login' }),
   });
-
-  const [facebookRequest, facebookResponse, promptFacebookAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: FACEBOOK_APP_ID,
-      scopes: ['public_profile', 'email'],
-      responseType: AuthSession.ResponseType.Token,
-      redirectUri: AuthSession.makeRedirectUri(),
-    },
-    facebookDiscovery
-  );
 
   useEffect(() => {
     if (googleResponse?.type !== 'success') return;
@@ -54,33 +54,16 @@ export default function LoginScreen() {
     if (!idToken) return;
     (async () => {
       setError('');
-      setSocialLoading('google');
+      setGoogleLoading(true);
       try {
         await signInWithGoogle(idToken);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Não foi possível entrar com Google.');
+        setError(loginErrorMessage(err, 'Não foi possível validar sua conta Google. Tente novamente.'));
       } finally {
-        setSocialLoading(null);
+        setGoogleLoading(false);
       }
     })();
   }, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (facebookResponse?.type !== 'success') return;
-    const accessToken = facebookResponse.authentication?.accessToken;
-    if (!accessToken) return;
-    (async () => {
-      setError('');
-      setSocialLoading('facebook');
-      try {
-        await signInWithFacebook(accessToken);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Não foi possível entrar com Facebook.');
-      } finally {
-        setSocialLoading(null);
-      }
-    })();
-  }, [facebookResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (field: keyof typeof form, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -97,21 +80,7 @@ export default function LoginScreen() {
       await signIn(form.email, form.password);
       // O RouteGuard detecta isAuthenticated = true e redireciona para /(app)/home automaticamente
     } catch (err) {
-      if (err instanceof NetworkError) {
-        setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
-      } else if (err instanceof AccountDisabledError) {
-        setError('Esta conta foi desativada. Entre em contato com o suporte se acredita que isso é um engano.');
-      } else if (err instanceof AccountBannedError) {
-        const until = new Date(err.bannedUntil).toLocaleString('pt-BR');
-        setError(`Sua conta está temporariamente banida até ${until}.`);
-      } else if (err instanceof AuthError) {
-        setError('E-mail ou senha inválidos. Tente novamente.');
-      } else {
-        // Erro inesperado: exibe a mensagem real para facilitar o diagnóstico
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error('[Login] Erro inesperado:', msg);
-        setError(`Erro inesperado: ${msg}`);
-      }
+      setError(loginErrorMessage(err, 'E-mail ou senha inválidos. Tente novamente.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -150,38 +119,14 @@ export default function LoginScreen() {
               <View style={styles.divider} />
             </View>
 
-            <View style={styles.socialRow}>
-              <View style={styles.socialButtonWrapper}>
-                <Button
-                  title="Facebook"
-                  variant="outline"
-                  icon={<FontAwesome name="facebook" size={24} color="#1877F2" />}
-                  onPress={() => promptFacebookAsync()}
-                  loading={socialLoading === 'facebook'}
-                  disabled={!facebookRequest || socialLoading !== null}
-                />
-                {!FACEBOOK_APP_ID && (
-                  <View style={styles.comingSoonOverlay} pointerEvents="none">
-                    <Text style={styles.comingSoonText}>Em Breve</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.socialButtonWrapper}>
-                <Button
-                  title="Google"
-                  variant="outline"
-                  icon={<FontAwesome name="google" size={24} color="#DB4437" />}
-                  onPress={() => promptGoogleAsync()}
-                  loading={socialLoading === 'google'}
-                  disabled={!googleRequest || socialLoading !== null}
-                />
-                {!GOOGLE_CLIENT_ID && (
-                  <View style={styles.comingSoonOverlay} pointerEvents="none">
-                    <Text style={styles.comingSoonText}>Em Breve</Text>
-                  </View>
-                )}
-              </View>
-            </View>
+            <Button
+              title="Entrar com Google"
+              variant="outline"
+              icon={<FontAwesome name="google" size={22} color="#DB4437" />}
+              onPress={() => promptGoogleAsync()}
+              loading={googleLoading}
+              disabled={!googleRequest || googleLoading}
+            />
 
             <Text style={styles.registerText}>
               Novo no Pote Cheio? <Link href="/register" style={styles.registerLink}>Cadastre-se</Link>
@@ -220,16 +165,6 @@ const styles = StyleSheet.create({
   dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 24 },
   divider: { flex: 1, height: 1, backgroundColor: COLORS.border },
   dividerText: { marginHorizontal: 10, color: COLORS.textLight },
-  socialRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  socialButtonWrapper: { flex: 1, position: 'relative' },
-  comingSoonOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  comingSoonText: { fontSize: 13, fontWeight: '700', color: COLORS.textDark, letterSpacing: 0.5 },
   registerText: { textAlign: 'center', marginTop: 24, fontSize: 16 },
   registerLink: { color: COLORS.secondary, fontWeight: 'bold' },
   termsText: { textAlign: 'center', marginTop: 16, fontSize: 12, color: COLORS.textDark },
