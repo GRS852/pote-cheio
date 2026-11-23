@@ -9,9 +9,11 @@ import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, us
 
 import AuthHeader from '../../components/AuthHeader';
 import Button from '../../components/Button';
+import GoogleSignupModal from '../../components/GoogleSignupModal';
 import Input from '../../components/Input';
+import { useOpenLegalPage } from '../../components/TermsCheckbox';
 import { COLORS } from '../../constants/theme';
-import { AccountBannedError, AccountDisabledError, AuthError, GoogleAccountError, NetworkError } from '../../services/authService';
+import { AccountBannedError, AccountDisabledError, AuthError, GoogleAccountError, NetworkError, TermsRequiredError, ValidationError } from '../../services/authService';
 import { useAuth } from '../../services/AuthContext';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -25,7 +27,7 @@ function loginErrorMessage(err: unknown, authFallback: string): string {
   if (err instanceof NetworkError) return 'Não foi possível conectar ao servidor. Verifique sua conexão.';
   if (err instanceof AccountDisabledError) return 'Esta conta foi desativada. Entre em contato com o suporte se acredita que isso é um engano.';
   if (err instanceof AccountBannedError) return `Sua conta está temporariamente banida até ${new Date(err.bannedUntil).toLocaleString('pt-BR')}.`;
-  if (err instanceof GoogleAccountError) return err.message;
+  if (err instanceof GoogleAccountError || err instanceof ValidationError) return err.message;
   if (err instanceof AuthError) return authFallback;
   return err instanceof Error ? err.message : String(err);
 }
@@ -35,6 +37,9 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+  // Token do Google guardado enquanto a pessoa aceita os termos (conta nova)
+  const [pendingGoogleToken, setPendingGoogleToken] = useState<string | null>(null);
+  const openLegalPage = useOpenLegalPage();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
   const { signIn, signInWithGoogle } = useAuth();
@@ -58,12 +63,24 @@ export default function LoginScreen() {
       try {
         await signInWithGoogle(idToken);
       } catch (err) {
-        setError(loginErrorMessage(err, 'Não foi possível validar sua conta Google. Tente novamente.'));
+        if (err instanceof TermsRequiredError) setPendingGoogleToken(idToken);
+        else setError(loginErrorMessage(err, 'Não foi possível validar sua conta Google. Tente novamente.'));
       } finally {
         setGoogleLoading(false);
       }
     })();
   }, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Conta nova pelo Google: cria só depois do aceite e da data de nascimento
+  async function handleGoogleSignup(birthDate: string) {
+    if (!pendingGoogleToken) return;
+    try {
+      await signInWithGoogle(pendingGoogleToken, { accepted_terms: true, birth_date: birthDate });
+      setPendingGoogleToken(null);
+    } catch (err) {
+      throw new Error(loginErrorMessage(err, 'Não foi possível validar sua conta Google. Tente novamente.'));
+    }
+  }
 
   const handleChange = (field: keyof typeof form, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -133,11 +150,19 @@ export default function LoginScreen() {
             </Text>
             
             <Text style={styles.termsText}>
-              Ao se inscrever, você concorda com os <Link href={"/terms" as any} style={styles.linkText}>termos de serviço</Link> e a <Text style={styles.linkText}>Política de Privacidade</Text>
+              <Text style={styles.linkText} onPress={() => openLegalPage('/terms')}>Termos de Uso</Text>
+              {'  ·  '}
+              <Text style={styles.linkText} onPress={() => openLegalPage('/privacy')}>Política de Privacidade</Text>
             </Text>
           </View>
         </View>
       </ScrollView>
+
+      <GoogleSignupModal
+        visible={pendingGoogleToken != null}
+        onCancel={() => setPendingGoogleToken(null)}
+        onConfirm={handleGoogleSignup}
+      />
     </KeyboardAvoidingView>
   );
 }

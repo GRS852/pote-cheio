@@ -1,31 +1,36 @@
 import { Link } from 'expo-router';
 import Head from 'expo-router/head';
 import React, { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import AuthHeader from '../../components/AuthHeader';
+import BirthDateFields from '../../components/BirthDateFields';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
-import { COLORS, SIZES } from '../../constants/theme';
+import TermsCheckbox from '../../components/TermsCheckbox';
+import { COLORS } from '../../constants/theme';
+import { birthDateError, buildBirthDate } from '../../services/age';
 import { useAuth } from '../../services/AuthContext';
 import { ConflictError, NetworkError, ValidationError } from '../../services/authService';
 
 export default function RegisterScreen() {
   const { signUp } = useAuth();
   const [form, setForm] = useState({ nome: '', dia: '', mes: '', ano: '', email: '', senha: '' });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleChange = (field: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [field]: value }));
-  const handleDateChange = (field: 'dia' | 'mes' | 'ano', value: string) =>
-    setForm(prev => ({ ...prev, [field]: value.replace(/[^0-9]/g, '') }));
 
   const handleRegister = async () => {
     setError('');
+    // Idade mínima conferida aqui e de novo na API
+    const ageError = birthDateError(form);
+    if (ageError) return setError(ageError);
+    if (!acceptedTerms) return setError('É preciso aceitar os Termos de Uso e a Política de Privacidade.');
     setLoading(true);
     try {
-      const birthDate = `${form.ano}-${form.mes.padStart(2, '0')}-${form.dia.padStart(2, '0')}`;
-      await signUp(form.nome, form.email, form.senha, birthDate);
+      await signUp(form.nome, form.email, form.senha, buildBirthDate(form) as string, acceptedTerms);
     } catch (e) {
       if (e instanceof ConflictError) setError('Este email já está cadastrado.');
       else if (e instanceof ValidationError) setError(e.message);
@@ -54,22 +59,15 @@ export default function RegisterScreen() {
           <View style={styles.card}>
             <Input label="Nome completo" placeholder="Insira seu nome completo" value={form.nome} onChangeText={(t) => handleChange('nome', t)} />
 
-            <Text style={styles.customLabel}>Data de nascimento</Text>
-            <View style={styles.dateRow}>
-              <TextInput style={styles.dateInput} placeholder="Dia" placeholderTextColor={COLORS.textDark} value={form.dia} onChangeText={(t) => handleDateChange('dia', t)} keyboardType="numeric" maxLength={2} />
-              <TextInput style={[styles.dateInput, styles.middleInput]} placeholder="Mês" placeholderTextColor={COLORS.textDark} value={form.mes} onChangeText={(t) => handleDateChange('mes', t)} keyboardType="numeric" maxLength={2} />
-              <TextInput style={styles.dateInput} placeholder="Ano" placeholderTextColor={COLORS.textDark} value={form.ano} onChangeText={(t) => handleDateChange('ano', t)} keyboardType="numeric" maxLength={4} />
-            </View>
+            <BirthDateFields value={form} onChange={b => setForm(prev => ({ ...prev, ...b }))} />
 
             <Input label="Email" placeholder="seu@email.com" value={form.email} onChangeText={(t) => handleChange('email', t)} />
             <Input label="Senha" placeholder="*******" secureTextEntry value={form.senha} onChangeText={(t) => handleChange('senha', t)} />
 
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <Button title="Continuar" onPress={handleRegister} loading={loading} />
+            <TermsCheckbox checked={acceptedTerms} onChange={setAcceptedTerms} />
 
-            <Text style={styles.termsText}>
-              Ao se inscrever, você concorda com os <Link href={"/terms" as any} style={styles.linkText}>termos de serviço</Link> e a <Text style={styles.linkText}>Política de Privacidade</Text>
-            </Text>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <Button title="Continuar" onPress={handleRegister} loading={loading} disabled={!acceptedTerms} />
           </View>
 
           <Text style={styles.loginText}>
@@ -91,12 +89,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: 'bold', color: '#000', marginBottom: 5 },
   subtitle: { fontSize: 16, color: COLORS.textDark, textAlign: 'center' },
   card: { backgroundColor: '#FFFFFF', width: '100%', maxWidth: 480, borderRadius: 16, padding: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, borderWidth: 1, borderColor: COLORS.border },
-  customLabel: { fontSize: 16, fontWeight: '600', color: '#000', marginBottom: 8 },
-  dateRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 16 },
-  dateInput: { flex: 1, minWidth: 0, backgroundColor: COLORS.inputBackground, borderWidth: 1, borderColor: COLORS.border, borderRadius: SIZES.radius, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#000', textAlign: 'center' },
-  middleInput: { marginHorizontal: 12 },
-  termsText: { textAlign: 'center', marginTop: 20, fontSize: 12, color: '#000' },
-  linkText: { color: COLORS.secondary },
   loginText: { marginTop: 24, fontSize: 16, color: COLORS.textDark },
   loginLink: { color: COLORS.primary, fontWeight: 'bold' },
   errorText: { color: 'red', fontSize: 14, marginBottom: 8, textAlign: 'center' }

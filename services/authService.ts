@@ -9,6 +9,10 @@ export type Usuario = {
   phone: string | null;
   cpf: string | null;
   avatar_url?: string | null;
+  // LGPD: true quando a pessoa ainda não aceitou a versão atual dos termos
+  terms_pending?: boolean;
+  // false nas contas criadas pelo Google (sem senha)
+  has_password?: boolean;
 };
 
 export class NetworkError extends Error {
@@ -63,6 +67,29 @@ export class ValidationError extends Error {
   }
 }
 
+// Login com Google de quem ainda não tem conta: o app pede o aceite dos
+// termos e a data de nascimento e reenvia o mesmo token
+export class TermsRequiredError extends Error {
+  constructor() {
+    super('É preciso aceitar os termos para criar a conta.');
+    this.name = 'TermsRequiredError';
+  }
+}
+
+// Erros de cadastro devolvidos pela API (400) em texto para a pessoa
+const SIGNUP_ERRORS: Record<string, string> = {
+  'Terms not accepted': 'É preciso aceitar os Termos de Uso e a Política de Privacidade.',
+  'Invalid birth date': 'Informe uma data de nascimento válida.',
+  Underage: 'É preciso ter 18 anos ou mais para usar o Pote Cheio.',
+};
+
+async function signupValidationError(response: Response): Promise<ValidationError> {
+  const body = await response.json().catch(() => ({}));
+  return new ValidationError(
+    SIGNUP_ERRORS[body?.error] ?? body?.message ?? 'Dados inválidos. Verifique as informações e tente novamente.'
+  );
+}
+
 export async function signInRequest(email: string, password: string) {
   let response: Response;
   try {
@@ -95,14 +122,15 @@ export async function signUpRequest(
   full_name: string,
   email: string,
   password: string,
-  birth_date: string
+  birth_date: string,
+  accepted_terms: boolean
 ) {
   let response: Response;
   try {
     response = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ full_name, email, password, birth_date }),
+      body: JSON.stringify({ full_name, email, password, birth_date, accepted_terms }),
     });
   } catch {
     throw new NetworkError();
@@ -111,27 +139,23 @@ export async function signUpRequest(
   if (response.status === 401 || response.status === 403) throw new AuthError();
   if (response.status === 409) throw new ConflictError();
 
-  if (response.status === 400) {
-    let msg = 'Dados inválidos. Verifique as informações e tente novamente.';
-    try {
-      const body = await response.json();
-      if (body?.message) msg = body.message;
-    } catch {}
-    throw new ValidationError(msg);
-  }
+  if (response.status === 400) throw await signupValidationError(response);
 
   if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
 
   return response.json();
 }
 
-export async function googleSignInRequest(idToken: string) {
+export async function googleSignInRequest(
+  idToken: string,
+  consent?: { accepted_terms: boolean; birth_date: string }
+) {
   let response: Response;
   try {
     response = await fetch(`${API_URL}/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id_token: idToken }),
+      body: JSON.stringify({ id_token: idToken, ...consent }),
     });
   } catch {
     throw new NetworkError();
@@ -142,6 +166,8 @@ export async function googleSignInRequest(idToken: string) {
     if (body?.error === 'Account disabled') throw new AccountDisabledError();
     if (body?.error === 'Account temporarily banned') throw new AccountBannedError(body.banned_until);
   }
+  if (response.status === 428) throw new TermsRequiredError();
+  if (response.status === 400) throw await signupValidationError(response);
   if (response.status === 401 || response.status === 403) throw new AuthError('Não foi possível validar sua conta Google.');
   if (!response.ok) throw new NetworkError(`Erro no servidor (${response.status}).`);
 
@@ -258,4 +284,43 @@ export async function getMeRequest(token: string): Promise<Usuario> {
 
   const data = await response.json();
   return data.user as Usuario;
+}
+
+export async function acceptTermsRequest(token: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/accept-terms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ accepted_terms: true }),
+    });
+  } catch {
+    throw new NetworkError();
+  }
+  if (!response.ok) throw new NetworkError(`Erro ao registrar o aceite (${response.status}).`);
+}
+
+// Exclui a própria conta. Quem tem senha confirma com a senha; quem entra só
+// pelo Google digita EXCLUIR.
+export async function deleteAccountRequest(
+  token: string,
+  confirmation: { password?: string; confirmation?: string }
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/me`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(confirmation),
+    });
+  } catch {
+    throw new NetworkError();
+  }
+  if (response.status === 401) {
+    const body = await response.json().catch(() => ({}));
+    if (body?.error === 'Invalid password') throw new AuthError('Senha incorreta.');
+    throw new AuthError('Sua sessão expirou. Entre novamente para excluir a conta.');
+  }
+  if (response.status === 400) throw new ValidationError('Digite EXCLUIR para confirmar.');
+  if (!response.ok) throw new NetworkError(`Erro ao excluir a conta (${response.status}).`);
 }

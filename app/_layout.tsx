@@ -4,10 +4,14 @@ import { Slot, useGlobalSearchParams, usePathname, useRouter, useSegments } from
 import { useEffect } from 'react';
 import { AdminAuthProvider } from '../services/AdminAuthContext';
 import { AuthProvider, useAuth } from '../services/AuthContext';
+import TermsAcceptanceModal from '../components/TermsAcceptanceModal';
 
 // Dentro de (app), só essas telas exigem login: doar, ver o próprio perfil
 // e mensagens. Catálogo, produto e perfil do doador ficam públicos.
 const PROTECTED_APP_ROUTES = ['donate', 'profile', 'messages', 'deliveries', 'donation-history'];
+
+// Páginas do grupo (auth) que quem está logado também pode abrir
+const PUBLIC_AUTH_PAGES = ['terms', 'privacy', 'help'];
 
 function buildRedirectTarget(pathname: string, params: Record<string, unknown>): string {
   const query = new URLSearchParams();
@@ -20,7 +24,7 @@ function buildRedirectTarget(pathname: string, params: Record<string, unknown>):
 }
 
 function RouteGuard() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const segments = useSegments();
   const pathname = usePathname();
   const params = useGlobalSearchParams<{ redirect?: string }>();
@@ -44,12 +48,23 @@ function RouteGuard() {
       return;
     }
 
-    if (isAuthenticated && inAuthGroup) {
+    if (isAuthenticated && inAuthGroup && !PUBLIC_AUTH_PAGES.includes(segmentList[1] ?? '')) {
       router.replace((params.redirect as string) || '/(app)/home');
     }
   }, [isAuthenticated, isLoading, segments, pathname]);
 
-  return <Slot />;
+  // LGPD: quem ainda não aceitou a versão atual dos termos aceita antes de
+  // continuar (menos nas próprias páginas dos termos, para conseguir lê-las)
+  const segmentList = segments as readonly string[];
+  const onLegalPage = segmentList[1] === 'terms' || segmentList[1] === 'privacy';
+  const termsPending = isAuthenticated && !!user?.terms_pending && segmentList[0] !== 'admin' && !onLegalPage;
+
+  return (
+    <>
+      <Slot />
+      <TermsAcceptanceModal visible={termsPending} />
+    </>
+  );
 }
 
 export default function RootLayout() {
