@@ -27,7 +27,9 @@ const MAX_PHOTOS = 5;
 
 export default function DonateScreen() {
   const router = useRouter();
-  const { token } = useAuth();
+  // isLoading: ao abrir ou recarregar a página, a sessão leva um instante para
+  // ser recuperada; até lá o botão de publicar fica desativado
+  const { token, isLoading: authLoading } = useAuth();
 
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<Category>('Coleiras');
@@ -162,7 +164,7 @@ export default function DonateScreen() {
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <Button title="Publicar doação" onPress={handleSubmit} loading={loading} />
+            <Button title="Publicar doação" onPress={handleSubmit} loading={loading || authLoading} disabled={authLoading} />
             <Button title="Cancelar" onPress={() => router.back()} variant="outline" />
           </View>
         </View>
