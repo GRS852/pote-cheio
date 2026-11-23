@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../constants/theme';
-import { AccountBannedError, AccountDisabledError, NetworkError, getMeRequest, googleSignInRequest, signInRequest, signUpRequest, Usuario } from './authService';
+import { AccountBannedError, AccountDisabledError, NetworkError, acceptTermsRequest, deleteAccountRequest, getMeRequest, googleSignInRequest, signInRequest, signUpRequest, Usuario } from './authService';
 import { connectSocket, disconnectSocket, onServerDisconnect } from './socketService';
 import { usePolling } from './usePolling';
 
@@ -36,9 +36,11 @@ type AuthContextType = {
   user: Usuario | null;
   token: string | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string, birthDate: string) => Promise<void>;
-  signInWithGoogle: (idToken: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string, birthDate: string, acceptedTerms: boolean) => Promise<void>;
+  signInWithGoogle: (idToken: string, consent?: { accepted_terms: boolean; birth_date: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  acceptTerms: () => Promise<void>;
+  deleteAccount: (confirmation: { password?: string; confirmation?: string }) => Promise<void>;
   refreshUser: () => Promise<void>;
   updateUserLocally: (partial: Partial<Usuario>) => void;
 };
@@ -115,8 +117,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { disconnectSocket(); };
   }, [token]);
 
-  async function signUp(name: string, email: string, password: string, birthDate: string) {
-    const data = await signUpRequest(name, email, password, birthDate);
+  async function signUp(name: string, email: string, password: string, birthDate: string, acceptedTerms: boolean) {
+    const data = await signUpRequest(name, email, password, birthDate, acceptedTerms);
 
     const received: string | undefined = data.token ?? data.access_token ?? data.jwt ?? data.authToken;
 
@@ -151,8 +153,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(true);
   }
 
-  async function signInWithGoogle(idToken: string) {
-    const data = await googleSignInRequest(idToken);
+  async function signInWithGoogle(idToken: string, consent?: { accepted_terms: boolean; birth_date: string }) {
+    const data = await googleSignInRequest(idToken, consent);
 
     const received: string | undefined = data.token ?? data.access_token ?? data.jwt ?? data.authToken;
 
@@ -176,6 +178,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(false);
   }
 
+  // Aceite dos termos por quem já tinha conta (janela no primeiro acesso)
+  async function acceptTerms() {
+    const current = tokenRef.current;
+    if (!current) return;
+    await acceptTermsRequest(current);
+    setUser(prev => prev ? { ...prev, terms_pending: false } : prev);
+  }
+
+  // Exclui a conta na API e encerra a sessão neste aparelho
+  async function deleteAccount(confirmation: { password?: string; confirmation?: string }) {
+    const current = tokenRef.current;
+    if (!current) return;
+    await deleteAccountRequest(current, confirmation);
+    await signOut();
+    setSessionNotice('Sua conta e seus dados foram excluídos. Obrigado por ter feito parte do Pote Cheio.');
+  }
+
   async function refreshUser() {
     const current = tokenRef.current;
     if (!current) return;
@@ -196,12 +215,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, token, signIn, signUp, signInWithGoogle, signOut, refreshUser, updateUserLocally }}>
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, token, signIn, signUp, signInWithGoogle, signOut, acceptTerms, deleteAccount, refreshUser, updateUserLocally }}>
       {children}
       <Modal visible={sessionNotice != null} transparent animationType="fade" onRequestClose={() => setSessionNotice(null)}>
         <View style={styles.overlay}>
           <View style={styles.box}>
-            <Text style={styles.title}>Sessão encerrada</Text>
+            <Text style={styles.title}>{sessionNotice?.startsWith('Sua conta e seus dados') ? 'Conta excluída' : 'Sessão encerrada'}</Text>
             <Text style={styles.message}>{sessionNotice}</Text>
             <TouchableOpacity style={styles.button} onPress={() => setSessionNotice(null)} activeOpacity={0.8}>
               <Text style={styles.buttonText}>Entendi</Text>

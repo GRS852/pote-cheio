@@ -16,6 +16,7 @@ import {
 
 import CancelDonationModal from '../../components/CancelDonationModal';
 import CloseDonationModal from '../../components/CloseDonationModal';
+import DeleteAccountModal from '../../components/DeleteAccountModal';
 import InterestedUsersModal from '../../components/InterestedUsersModal';
 import MainHeader from '../../components/MainHeader';
 import ModerationNoticesCard from '../../components/ModerationNoticesCard';
@@ -107,7 +108,9 @@ export default function ProfileScreen() {
   const [reportCommentId, setReportCommentId] = useState<number | null>(null);
   const [moderationNotices, setModerationNotices] = useState<ModerationNotice[]>([]);
 
-  const { signOut, user, token, updateUserLocally } = useAuth();
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+
+  const { signOut, deleteAccount, user, token, updateUserLocally } = useAuth();
 
   useEffect(() => {
     if (!token) return;
@@ -719,6 +722,19 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
 
+          {/* LGPD: a própria pessoa pode excluir a conta e os dados */}
+          <TouchableOpacity style={styles.deleteAccountButton} onPress={() => setShowDeleteAccount(true)} activeOpacity={0.7}>
+            <FontAwesome name="trash-o" size={15} color={COLORS.textDark} />
+            <Text style={styles.deleteAccountText}>Excluir minha conta</Text>
+          </TouchableOpacity>
+
+          <DeleteAccountModal
+            visible={showDeleteAccount}
+            hasPassword={user?.has_password !== false}
+            onClose={() => setShowDeleteAccount(false)}
+            onConfirm={deleteAccount}
+          />
+
         </View>
       </ScrollView>
     </View>
@@ -776,6 +792,8 @@ const styles = StyleSheet.create({
   // Logout
   logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 32, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#C0392B', backgroundColor: '#FFF5F5' },
   logoutText: { fontSize: 16, fontWeight: '600', color: '#C0392B' },
+  deleteAccountButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18, paddingVertical: 10, alignSelf: 'center' },
+  deleteAccountText: { fontSize: 14, color: COLORS.textDark, textDecorationLine: 'underline' },
   logoutConfirmBox: { marginTop: 32, padding: 20, backgroundColor: '#FFF5F5', borderRadius: 12, borderWidth: 1.5, borderColor: '#C0392B' },
   logoutConfirmQuestion: { fontSize: 15, color: '#C0392B', textAlign: 'center', marginBottom: 16, fontWeight: '600' },
   logoutConfirmButtons: { flexDirection: 'row', gap: 12 },
